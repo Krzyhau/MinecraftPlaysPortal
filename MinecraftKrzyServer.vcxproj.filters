@@ -6,6 +6,7 @@
     <ClCompile Include="ServerConnection.cpp" />
     <ClCompile Include="MinecraftServer.cpp" />
     <ClCompile Include="NBT.cpp" />
+    <ClCompile Include="MinecraftChunk.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Packet.hpp" />
@@ -14,5 +15,6 @@
     <ClInclude Include="common.hpp" />
     <ClInclude Include="NBT.hpp" />
     <ClInclude Include="MinecraftServerResources.hpp" />
+    <ClInclude Include="MinecraftChunk.hpp" />
   </ItemGroup>
 </Project>

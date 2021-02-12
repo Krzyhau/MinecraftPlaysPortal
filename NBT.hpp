@@ -24,6 +24,7 @@ namespace MCP {
         string name;
         char* payload;
         int headerSize;
+        int tagSize = 0;
     public:
         NBTTag();
         NBTTag(string name);
@@ -71,7 +72,7 @@ namespace MCP {
 
         void SetList(NBTList* list);
 
-        int size(bool noHeader = false) const;
+        int size(bool noHeader = false, bool recalculate = false);
         string ToString(int tab=0, bool showHeader=true);
         int WriteToBuffer(char* buffer, bool noHeader = false);
     };

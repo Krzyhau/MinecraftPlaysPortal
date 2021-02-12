@@ -153,6 +153,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MinecraftChunk.cpp" />
     <ClCompile Include="NBT.cpp" />
     <ClCompile Include="Packet.cpp" />
     <ClCompile Include="MinecraftServer.cpp" />
@@ -160,6 +161,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.hpp" />
+    <ClInclude Include="MinecraftChunk.hpp" />
     <ClInclude Include="MinecraftServerResources.hpp" />
     <ClInclude Include="NBT.hpp" />
     <ClInclude Include="Packet.hpp" />

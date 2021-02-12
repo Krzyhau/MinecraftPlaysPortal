@@ -190,13 +190,27 @@ namespace MCP {
         offset += nbt.size();
         return nbt;
     }
-
     void Packet::WriteNBT(NBTTag tag)
     {
         int nbtsize = tag.size();
         if (offset + nbtsize < MC_MAX_PACKET_SIZE) {
             tag.WriteToBuffer(&buffer[offset]);
             offset += nbtsize;
+        }
+    }
+
+    char* Packet::ReadByteArray(int length)
+    {
+        char* result = &buffer[offset];
+        offset += length;
+        return result;
+    }
+
+    void Packet::WriteByteArray(char* array, int length)
+    {
+        if (offset+length < MC_MAX_PACKET_SIZE) {
+            memcpy(&buffer[offset], array, length);
+            offset+=length;
         }
     }
 
@@ -214,9 +228,7 @@ namespace MCP {
 
         while (charCount < length) {
             uint8_t byte = ReadByte();
-            if ((byte & 0b11000000) != 0b10000000) {
-                charCount++;
-            }
+            charCount++;
         }
 
         return std::string(buffer + oldOffset, offset - oldOffset);
@@ -226,9 +238,7 @@ namespace MCP {
         int charCount = 0;
 
         for (unsigned char c : value) {
-            if ((c & 0b11000000) != 0b10000000) {
-                charCount++;
-            }
+            charCount++;
         }
 
         WriteVarInt(charCount);

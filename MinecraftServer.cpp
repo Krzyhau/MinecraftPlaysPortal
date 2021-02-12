@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "Packet.hpp"
 #include "NBT.hpp"
+#include "MinecraftChunk.hpp"
 
 #include "MinecraftServerResources.hpp"
 
@@ -10,10 +11,11 @@ using namespace std;
 using namespace MCP;
 
 MinecraftServer* gMCServer = new MinecraftServer();
-
+ChunkWorld* gWorld = new ChunkWorld();
 
 MinecraftServer::MinecraftServer()
 {
+
 }
 
 MinecraftServer::~MinecraftServer()
@@ -24,16 +26,43 @@ MinecraftServer::~MinecraftServer()
 
 void MinecraftServer::Start()
 {
+    cout << "\"Minecraft Plays Portal 2\" custom bong server!!!!" << endl << endl;
+
+    cout << "Loading dimension codec..." << endl;
+    NBTTag codec = MCP::GetDimensionCodecNBT();
+
+    cout << "Creating world... " << endl;
+    CreateWorld();
+
+    cout << "Initializing socket handler... " << endl;
     socketHandler.Initialize();
 
     socketHandler.SetReceiveCallback([](ServerConnection * con) {
-        gMCServer->OnPacketReceive((MinecraftConnection*)con); // thats bad lol
+        gMCServer->OnPacketReceive((MinecraftConnection*)con); // thats soo bad lol
     });
 
+    cout << "Server is active. Running in a loop..." << endl;
     while (socketHandler.IsActive()) {
         Update();
     }
 }
+
+void MinecraftServer::CreateWorld() 
+{
+    // simple checker pattern
+    for (int x = -8; x <= 8; x++) for (int z = -8; z <= 8; z++) {
+        short blockID = (x + z) % 2 == 0 ? 1 : 2;
+        gWorld->SetBlockID(x, 1, z, blockID);
+    }
+    
+    gWorld->SetBlockID(9, 2, -1, 3355);
+    gWorld->SetBlockID(9, 2, 1, 3355);
+    gWorld->SetBlockID(9, 3, 0, 3355);
+    gWorld->SetBlockID(9, 4, 0, 3355);
+    gWorld->SetBlockID(9, 5, 0, 3355);
+    gWorld->SetBlockID(9, 6, 0, 3354);
+}
+
 
 
 void MinecraftServer::Update()
@@ -41,8 +70,64 @@ void MinecraftServer::Update()
     // clean connections that have already ended
     socketHandler.CheckConnections();
     // wait for new connections
-    socketHandler.PrepareNewConnection(new MinecraftConnection(&socketHandler));
+    if (socketHandler.HasNewConnection()) {
+        socketHandler.PrepareNewConnection(new MinecraftConnection(&socketHandler));
+    }
+
+    uint64_t now = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+
+    for (ServerConnection* con : socketHandler.GetConnections()) {
+        if (!con->IsActive())continue;
+        MinecraftConnection* mccon = (MinecraftConnection*)con;
+        if (mccon->state != PLAY) continue;
+
+        // handle Keep Alive packet
+        if (mccon->lastAlive + 10000 < now) {
+            if (mccon->lastAliveVerified) {
+                mccon->lastAlive = now;
+                mccon->lastAliveVerified = false;
+                MCP::Packet keepAlive(0x1F);
+                keepAlive.WriteLong(now);
+                keepAlive.Send(mccon);
+            }
+            else {
+                MCP::Packet disconnect(0x00);
+                disconnect.WriteString(R"( {"text":"Timed out.","bold":"true"} )");
+                disconnect.Send(mccon);
+                mccon->Close();
+            }
+        }
+
+        // handle chat
+        for (ChatMessage& message : chatMessages) {
+            string chatMsg = "[{\"text\":\"\"},";
+
+            if (message.sender == "server.join") {
+                chatMsg += "{\"text\":\"" + message.message + "\",\"color\":\"yellow\",\"bold\":true},";
+                chatMsg += "{\"text\":\" joined.\",\"color\":\"yellow\"}]";
+            }
+            else {
+                chatMsg += "{\"text\":\"" + message.sender + ": \",\"bold\":true},";
+                chatMsg += "{\"text\":\"" + message.message + "\"}]";
+            }
+            
+
+            MCP::Packet testMessage(0x0E);
+            testMessage.WriteString(chatMsg);
+            testMessage.WriteByte(0);
+            testMessage.WriteUUID({ 0,0 });
+            testMessage.Send(mccon);
+        }
+    }
+
+    //clean chat buffer
+    chatMessages.clear();
+
+    //sleep, just dont take up all processing power when not needed lmfao
+    std::this_thread::sleep_for(1ms);
 }
+
+
 
 void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
 
@@ -90,29 +175,45 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
                 string playerName = inPacket.ReadString();
                 con->playerName = playerName;
                 
-                
-                // just to make UUID unique for a player, will replace it later
-                MCP::LoginSuccessOutPacket loginSuccess(
-                    MCP::UUID(playerName.length(), (int)(playerName[0])),
-                    playerName
-                );
+
+                // getting minecraft skin for given nickname
+
+                // step 1: load uuid from playerdb.co (eg. https://playerdb.co/api/player/minecraft/Krzyhu)
+
+                // step 2: load texture string from mojang servers
+                // (eg. https://sessionserver.mojang.com/session/minecraft/profile/16632b42ebd24df0a71ae3745ea14a5f)
+
+                string s = HttpGetRequest("playerdb.co", "/api/player/minecraft/Krzyhu");
+                cout << "Kurwa: " << s << endl;
+
+                // just to make UUID unique for a player, will replace it later maybe idk
+                uint64_t uniqueId1 = 0, uniqueId2 = playerName.length();
+                uniqueId2 = uniqueId2 << 32;
+                for (char& c : playerName) {
+                    uniqueId1 *= 100;
+                    uniqueId1 += c;
+                    uniqueId2 += c;
+                }
+                con->uuid = MCP::UUID(uniqueId1, uniqueId2);
+
+                // fuck verification, its login time
+                MCP::LoginSuccessOutPacket loginSuccess(con->uuid, playerName);
                 loginSuccess.Send(con);
 
                 con->state = PLAY;
-
 
                 // Send crazy ass join game packet
                 MCP::Packet joinGame(0x24);
                 joinGame.WriteInt(0); // Entity ID
                 joinGame.WriteByte(0); // is hardcore?
                 joinGame.WriteByte(2); // gamemode, 2 = adventure
-                joinGame.WriteByte(-1); // previous gamemode???
+                joinGame.WriteByte(-1); // previous gamemode??? why tf would you need that??
                 joinGame.WriteVarInt(1); // size of worlds existing
-                joinGame.WriteString("minecraft:overworld"); // list of all (1) worlds existing
-                joinGame.WriteNBT(*MCP::GetDimensionCodecNBT()); // dimension codec
+                joinGame.WriteString("minecraft:the_end"); // list of all (1) worlds existing
+                joinGame.WriteNBT(MCP::GetDimensionCodecNBT()); // dimension codec
                 joinGame.WriteNBT(*MCP::GetDimensionTypeNBT()); // dimension type
-                joinGame.WriteString("minecraft:overworld"); //spawned world name
-                joinGame.WriteLong(0); //first 8 bytes of hashed seed (idk)
+                joinGame.WriteString("minecraft:the_end"); //spawned world name
+                joinGame.WriteLong(0); //first 8 bytes of hashed seed (idk lol)
                 joinGame.WriteVarInt(0); // max players, ignored
                 joinGame.WriteVarInt(2); // render distance
                 joinGame.WriteByte(0); // reduced debug info
@@ -122,85 +223,45 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
 
                 joinGame.Send(con); // amen.
 
-                for (int x = -4; x <= 4; x++) for (int y = -4; y <= 4; y++) {
-                    MCP::Packet chunk(0x20);
-                    chunk.WriteInt(x); // Chunk X
-                    chunk.WriteInt(y); // Chunk Y
-                    chunk.WriteByte(1); // Full chunk bool
-                    chunk.WriteVarInt(1);  // primary bit mask
-                    chunk.WriteInt(0x0A000000); // heightmap NBT list. not needed for what I do, so I send empty compound
-                    chunk.WriteVarInt(1024);  // biomes array length
-                    for (int i = 0; i < 1024; i++) {
-                        chunk.WriteVarInt(0);
-                    }
-                    chunk.WriteVarInt(2057);  // data size
-                    //chunk
-                    chunk.WriteShort(256);  // num of non-air blocks
-                    chunk.WriteByte(4); // bites for single block, 4 is min
-                    chunk.WriteVarInt(3); // num of blocks in lookup table
-                    chunk.WriteVarInt(0); // block 0 (air)
-                    chunk.WriteVarInt(1); // block 1 (stone)
-                    chunk.WriteVarInt(2); // block 2 (dirt)
-                    chunk.WriteVarInt(256); // number of longs in upcoming data
-                    for (int i = 0; i < 16; i++) {
-                        if (i % 2 == 0) {
-                            chunk.WriteLong(0x1212121212121212);
-                        }
-                        else {
-                            chunk.WriteLong(0x2121212121212121);
-                        }
-                    }
-                    for (int i = 0; i < 240; i++) {
-                        chunk.WriteLong(0);
-                    }
 
-                    chunk.WriteVarInt(0);  // block entities length
-
-                    chunk.Send(con);
+                // send joining message
+                chatMessages.push_back({ "server.join", playerName });
 
 
-                    MCP::Packet lightUpdate(0x23);
-                    lightUpdate.WriteVarInt(x); // Chunk X
-                    lightUpdate.WriteVarInt(y); // Chunk Y
-                    lightUpdate.WriteByte(0); // trust edges?
-                    lightUpdate.WriteVarInt(0b000000000000000010); // sky light mask
-                    lightUpdate.WriteVarInt(0b000000000000000010); // block light mask
-                    lightUpdate.WriteVarInt(0b111111111111111101); // empty sky light mask
-                    lightUpdate.WriteVarInt(0b111111111111111101); // empty block light mask
+                // send all chunks from created world
+                for (Chunk* chunk : gWorld->chunks) {
+                    MCP::ChunkPacket chunkPacket(chunk);
+                    chunkPacket.Send(con);
 
-                    lightUpdate.WriteVarInt(2048);
-                    for (int i = 0; i < 256; i++) {
-                        lightUpdate.WriteLong(0xFFFFFFFFFFFFFFFF);
-                    }
-                    lightUpdate.WriteVarInt(2048);
-                    for (int i = 0; i < 256; i++) {
-                        lightUpdate.WriteLong(0xFFFFFFFFFFFFFFFF);
-                    }
-
-                    lightUpdate.Send(con);
+                    MCP::FullBrightLightChunkPacket fullBright(chunk);
+                    fullBright.Send(con);
                 }
-
-
 
                 //send "Player Position And Look" packet
                 MCP::Packet ppal(0x34);
-                ppal.WriteDouble(8); //x
+                ppal.WriteDouble(0); //x
                 ppal.WriteDouble(5); //y
-                ppal.WriteDouble(8); //z
+                ppal.WriteDouble(0); //z
                 ppal.WriteFloat(0); //yaw
                 ppal.WriteFloat(0); //pitch
                 ppal.WriteByte(0); //relative teleportation flags
                 ppal.WriteVarInt(69); //teleport id, client should resend Teleport Confirm (0x00) with this number
                 ppal.Send(con);
-
-                /*MCP::Packet disconnect(0x00);
-                disconnect.WriteString(R"( {"text":"Kurwa wypierdalaj.","bold":"true"} )");
-                disconnect.Send(con);*/
                 
             }
         }
         else if (con->state == PLAY) {
-
+            if (inPacket.id == 0x10) { // keep alive (serverbound) (confirming the keep alive packet)
+                uint64_t keepAliveId = inPacket.ReadLong();
+                cout << "Received Keep Alive with param " << keepAliveId << endl;
+                if (keepAliveId == con->lastAlive) {
+                    con->lastAliveVerified = true;
+                }
+            }
+            if (inPacket.id == 0x03) { // chat message (serverbound)
+                string message = inPacket.ReadString();
+                chatMessages.push_back({con->playerName, message});
+            }
         }
     }
 }

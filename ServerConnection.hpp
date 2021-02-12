@@ -34,11 +34,13 @@ public:
 
     void CheckConnections();
     void PrepareNewConnection(ServerConnection* con = nullptr);
+    bool HasNewConnection();
 
     void SetReceiveCallback(ReceiveCallback callback) { receiveCallback = callback; }
     void HandleReceive(ServerConnection* con);
 
     SOCKET GetListenerSocket() { return listenerSocket; }
+    vector<ServerConnection*> GetConnections() { return connections; }
     int ClientCount() { return connections.size(); };
 };
 

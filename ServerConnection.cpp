@@ -72,6 +72,14 @@ void ServerConnectionHandler::PrepareNewConnection(ServerConnection* con)
     }
 }
 
+bool ServerConnectionHandler::HasNewConnection()
+{
+    fd_set fdset{ 1, {listenerSocket} };
+    timeval time{ 0,0 };
+    int result = select(1, &fdset, NULL, NULL, &time);
+    return result > 0;
+}
+
 
 void ServerConnectionHandler::HandleReceive(ServerConnection* con)
 {

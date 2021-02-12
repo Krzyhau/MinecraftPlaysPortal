@@ -2,6 +2,7 @@
 
 #include "ServerConnection.hpp"
 #include "Packet.hpp"
+#include "MinecraftChunk.hpp"
 
 namespace MCP {
     class HandshakeInPacket : public Packet {
@@ -38,11 +39,20 @@ enum MinecraftConnectionState {
     PLAY
 };
 
+struct ChatMessage {
+    string sender;
+    string message;
+};
+
 class MinecraftConnection : public ServerConnection {
 public:
     MinecraftConnectionState state = NONE;
     int protocolVer = 0;
     std::string playerName;
+    MCP::UUID uuid;
+
+    uint64_t lastAlive = 0;
+    bool lastAliveVerified = true;
 public:
     MinecraftConnection(ServerConnectionHandler* handler) : ServerConnection(handler) {};
 };
@@ -51,12 +61,15 @@ public:
 class MinecraftServer {
 private:
     ServerConnectionHandler socketHandler;
+    vector<ChatMessage> chatMessages;
 public:
     MinecraftServer();
     ~MinecraftServer();
 public:
     void Start();
     
+    void CreateWorld();
+
     void Update();
     void OnPacketReceive(MinecraftConnection* con);
 

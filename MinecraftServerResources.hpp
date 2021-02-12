@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "common.hpp"
 #include "NBT.hpp"
 #include <fstream>
 
@@ -8,33 +9,39 @@ namespace MCP {
     static NBTTag* GetDimensionTypeNBT() {
         return NBTTag::List("element", TAG_Compound, {
             NBTTag::Byte("piglin_safe",0),
-            NBTTag::Byte("natural",1),
+            NBTTag::Byte("natural",0),
             NBTTag::Float("ambient_light",0.0f),
-            NBTTag::String("infiniburn","minecraft:infiniburn_overworld"),
+            NBTTag::String("infiniburn","minecraft:infiniburn_end"),
             NBTTag::Byte("respawn_anchor_works", 0),
-            NBTTag::Byte("has_skylight",1),
-            NBTTag::Byte("bed_works",1),
-            NBTTag::String("effects","minecraft:overworld"),
+            NBTTag::Byte("has_skylight",0),
+            NBTTag::Byte("bed_works",0),
+            NBTTag::String("effects","minecraft:the_end"),
             NBTTag::Byte("has_raids",1),
             NBTTag::Int("logical_height",256),
             NBTTag::Double("coordinate_scale",1.0),
             NBTTag::Byte("ultrawarm",0),
             NBTTag::Byte("has_ceiling",0),
+            NBTTag::Int("fixed_time",6000),
         });
     }
-    static NBTTag* GetDimensionCodecNBT() {
-        // binary mode is only for switching off newline translation
-        std::ifstream nbtFile("res/dimension_registry.nbt", std::ios::binary);
+    static NBTTag GetDimensionCodecNBT() {
+        //storing the tag in a static pointer
+        static NBTTag nbt;
+        static bool created = false;
+        if (!created) {
+            // binary mode is only for switching off newline translation
+            std::ifstream nbtFile("res/dimension_registry.nbt", std::ios::binary);
 
-        nbtFile.seekg(0, std::ios::end);
-        int nbtFileSize = nbtFile.tellg();
-        nbtFile.seekg(0, std::ios::beg);
+            nbtFile.seekg(0, std::ios::end);
+            uint32_t nbtFileSize = (uint32_t)nbtFile.tellg();
+            nbtFile.seekg(0, std::ios::beg);
 
-        char* buffer = new char[nbtFileSize];
-        nbtFile.read(buffer, nbtFileSize);
+            char* buffer = new char[nbtFileSize];
+            nbtFile.read(buffer, nbtFileSize);
 
-        NBTTag* nbt = new NBTTag(buffer, false);
-        delete buffer;
+            nbt = NBTTag(buffer, true);
+            created = true;
+        }
         return nbt;
     }
 
@@ -65,21 +72,56 @@ namespace MCP {
             "5ErkJggg==";
     }
 
-    static std::string GetServerInfo(MinecraftConnection* con) {
+    static string GetServerInfo(MinecraftConnection* con) {
         return
         "{"
             "\"version\": {"
                 "\"name\": \"1.16.4\","
-                "\"protocol\": " + std::to_string(con->protocolVer) + ""
+                "\"protocol\": " + to_string(con->protocolVer) + ""
             "},"
             "\"players\": {"
                 "\"max\": -69,"
                 "\"online\": 0"
             "},"
             "\"description\": {"
-                "\"text\": \"Portal 2 Minecraft Controller Project\""
+                "\"text\": \"Minecraft Plays Portal 2\""
             "},"
             "\"favicon\": \""+ GetServerFaviconBase64() +"\""
         "}";
+    }
+
+    static string HttpGetRequest(string address, string request) {
+        string output("");
+
+        addrinfo hints = {0}, * host;
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+
+        int status = getaddrinfo(address.c_str(), "443", &hints, &host);
+        if(status != 0) return output;
+
+        SOCKET webSock = socket(host->ai_family, host->ai_socktype, host->ai_protocol);
+
+        if (connect(webSock, host->ai_addr, host->ai_addrlen) != 0) {
+            return output;
+        }
+
+        string get_request("GET ");
+        get_request += request + " HTTP/1.1\r\nHost: " + address + "\r\nConnection: close\r\n\r\n";
+        send(webSock, get_request.c_str(), strlen(get_request.c_str()), 0);
+
+
+        char* buffer = new char[MC_MAX_PACKET_SIZE];
+        int dataSize = recv(webSock, buffer, 10000, 0);
+        
+        if (dataSize > 0) {
+            output = string(buffer, dataSize);
+        }
+
+        closesocket(webSock);
+        freeaddrinfo(host);
+        delete[] buffer;
+        return output;
     }
 }

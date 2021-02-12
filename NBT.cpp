@@ -24,6 +24,7 @@ namespace MCP {
         , written(false)
     {
         headerSize = 3 + name.size();
+        size(true, true);
     }
 
     NBTTag::NBTTag(char* data, bool readOnly) : written(!readOnly) {
@@ -44,8 +45,8 @@ namespace MCP {
             headerSize = 3 + nameLen;
             payload = &data[headerSize];
             // make a copy of the buffer if it's not read only
+            int length = size(true, true);
             if (!readOnly) {
-                int length = size(true);
                 char* newPayload = new char[length];
                 memcpy(newPayload, payload, length);
                 payload = newPayload;
@@ -237,6 +238,7 @@ namespace MCP {
         type = TAG_Byte;
         payload = new char[1];
         payload[0] = value;
+        size(true, true);
     }
 
     void NBTTag::SetShort(uint16_t value)
@@ -246,6 +248,7 @@ namespace MCP {
         payload = new char[2];
         payload[0] = (value & 0xFF00) >> 8;
         payload[1] = (value & 0x00FF);
+        size(true, true);
     }
 
     void NBTTag::SetInt(uint32_t value)
@@ -256,6 +259,7 @@ namespace MCP {
         for (int i = 0; i < 4; i++) {
             payload[i] = (value & ((uint32_t)0xFF << ((3-i) * 8))) >> ((3-i)*8);
         }
+        size(true, true);
     }
 
     void NBTTag::SetLong(uint64_t value)
@@ -266,6 +270,7 @@ namespace MCP {
         for (int i = 0; i < 8; i++) {
             payload[i] = (value & ((uint64_t)0xFF << ((7 - i) * 8))) >> ((7 - i) * 8);
         }
+        size(true, true);
     }
 
     void NBTTag::SetFloat(float value)
@@ -273,6 +278,7 @@ namespace MCP {
         Clear();
         SetInt(*(uint32_t*)& value);
         type = TAG_Float;
+        size(true, true);
     }
 
     void NBTTag::SetDouble(double value)
@@ -280,6 +286,7 @@ namespace MCP {
         Clear();
         SetLong(*(uint64_t*)& value);
         type = TAG_Double;
+        size(true, true);
     }
 
     void NBTTag::SetString(string value)
@@ -294,6 +301,7 @@ namespace MCP {
         for (size_t i = 0; i < value.size(); i++) {
             payload[2 + i] = c[i];
         }
+        size(true, true);
     }
 
     void NBTTag::SetList(NBTList* list)
@@ -302,39 +310,48 @@ namespace MCP {
         type = list->GetType();
         payload = new char[list->size()];
         list->WriteToBuffer(payload);
+        size(true, true);
     }
 
 
     // get size of the tag (full size is header + payload size)
-    int NBTTag::size(bool noHeader) const{
-        int size = noHeader ? 0 : headerSize;
-        switch (type) {
-        case TAG_Byte:  size += 1; break;
-        case TAG_Short: size += 2; break;
-        case TAG_Int: case TAG_Float:
-            size += 4; break;
-        case TAG_Long: case TAG_Double:
-            size += 8; break;
-        case TAG_ByteArray:
-            size += GetByteArray(true).size();
-            break;
-        case TAG_IntArray:
-            size += GetIntArray(true).size();
-            break;
-        case TAG_LongArray:
-            size += GetLongArray(true).size();
-            break;
-        case TAG_List:
-            size += GetList(true).size();
-            break;
-        case TAG_Compound:
-            size += GetCompound(true).size();
-            break;
-        case TAG_String:
-            size += 2 + GetString(true).size();
-            break;
-        default: break;
+    // also used to recalculate the size when changing the tag
+    int NBTTag::size(bool noHeader, bool recalculate) {
+        int size = 0;
+        if (recalculate) {
+            switch (type) {
+            case TAG_Byte:  size += 1; break;
+            case TAG_Short: size += 2; break;
+            case TAG_Int: case TAG_Float:
+                size += 4; break;
+            case TAG_Long: case TAG_Double:
+                size += 8; break;
+            case TAG_ByteArray:
+                size += GetByteArray(true).size();
+                break;
+            case TAG_IntArray:
+                size += GetIntArray(true).size();
+                break;
+            case TAG_LongArray:
+                size += GetLongArray(true).size();
+                break;
+            case TAG_List:
+                size += GetList(true).size();
+                break;
+            case TAG_Compound:
+                size += GetCompound(true).size();
+                break;
+            case TAG_String:
+                size += 2 + GetString(true).size();
+                break;
+            default: break;
+            }
+            tagSize = size;
         }
+        else {
+            size = tagSize;
+        }
+        size += noHeader ? 0 : headerSize;
         return size;
     }
 
@@ -388,7 +405,7 @@ namespace MCP {
 
     // write the tag to custom byte buffer
     int NBTTag::WriteToBuffer(char* buffer, bool noHeader) {
-        int s = size(true);
+        int s = size(true, true);
 
         int offset = 0;
 

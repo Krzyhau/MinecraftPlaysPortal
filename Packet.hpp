@@ -87,6 +87,9 @@ namespace MCP {
         NBTTag ReadNBT();
         void WriteNBT(NBTTag tag);
 
+        char* ReadByteArray(int length);
+        void WriteByteArray(char* array, int length);
+
         int GetSize();
         void SetSizeHeader();
         void Send(ServerConnection* con);
