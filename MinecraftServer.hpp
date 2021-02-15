@@ -3,6 +3,7 @@
 #include "ServerConnection.hpp"
 #include "Packet.hpp"
 #include "MinecraftChunk.hpp"
+#include "DumbController.hpp"
 
 namespace MCP {
     class HandshakeInPacket : public Packet {
@@ -39,20 +40,50 @@ enum MinecraftConnectionState {
     PLAY
 };
 
+enum ChatMessageType {
+    Message,
+    Join,
+    Leave,
+    ServerInfo
+};
+
 struct ChatMessage {
-    string sender;
+    MinecraftConnection* sender;
+    ChatMessageType type;
     string message;
+};
+
+struct PlayerPosition {
+    double x = 0;
+    double y = 0;
+    double z = 0;
+    float yaw = 0;
+    float pitch = 0;
+    bool onGround = false;
 };
 
 class MinecraftConnection : public ServerConnection {
 public:
     MinecraftConnectionState state = NONE;
+    bool joined = false;
+
     int protocolVer = 0;
-    std::string playerName;
+    string playerName;
     MCP::UUID uuid;
+    uint32_t entityId = 0;
+    string texture;
+
+    PlayerPosition position;
+    PlayerPosition oldPosition;
+    uint8_t crouchingState = 0;
+    uint8_t handAnimState = 0;
+
+    DumbInputType currentControllerZone = None;
 
     uint64_t lastAlive = 0;
     bool lastAliveVerified = true;
+
+
 public:
     MinecraftConnection(ServerConnectionHandler* handler) : ServerConnection(handler) {};
 };
@@ -62,6 +93,7 @@ class MinecraftServer {
 private:
     ServerConnectionHandler socketHandler;
     vector<ChatMessage> chatMessages;
+    int nextEntityId = 1;
 public:
     MinecraftServer();
     ~MinecraftServer();
@@ -69,6 +101,7 @@ public:
     void Start();
     
     void CreateWorld();
+    uint32_t ReserveEntityID();
 
     void Update();
     void OnPacketReceive(MinecraftConnection* con);

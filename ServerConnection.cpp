@@ -51,9 +51,19 @@ void ServerConnectionHandler::Close()
 
 void ServerConnectionHandler::CheckConnections() 
 {
+    // deleting connections that has ended in past
+    for (ServerConnection* con : endedConnections) {
+        delete con;
+    }
+    endedConnections.clear();
+
+    // removing connections from active connections
+    // not deleting them immediately, in case something wants to use it
     for (auto it = connections.begin(); it != connections.end();) {
-        if (!((*it)->IsActive())) {
+        ServerConnection* con = *it;
+        if (!con->IsActive()) {
             it = connections.erase(it);
+            endedConnections.push_back(con);
         }
         else {
             ++it;
@@ -116,7 +126,10 @@ ServerConnection::ServerConnection(ServerConnectionHandler* handler) {
 
 bool ServerConnection::Activate()
 {
-    connectionSocket = accept(socketHandler->GetListenerSocket(), NULL, NULL);
+    sockaddr_in clientAddr;
+    clientAddr.sin_family = AF_INET;
+    int clientAddrLen = sizeof(clientAddr);
+    connectionSocket = accept(socketHandler->GetListenerSocket(), (sockaddr*)&clientAddr, &clientAddrLen);
     // accept new connection socket using listener
     if (connectionSocket == INVALID_SOCKET)
     {
@@ -124,6 +137,12 @@ bool ServerConnection::Activate()
     }
     else {
         active = true;
+        // FUCK YOU I CAN DO WHATEVER
+        ipAddress = "";
+        ipAddress += to_string(clientAddr.sin_addr.s_addr & 0xFF) + ".";
+        ipAddress += to_string((clientAddr.sin_addr.s_addr & 0xFF00) >> 8) + ".";
+        ipAddress += to_string((clientAddr.sin_addr.s_addr & 0xFF0000) >> 16) + ".";
+        ipAddress += to_string((clientAddr.sin_addr.s_addr & 0xFF000000) >> 24);
         // create thread for this new connection
         connectionThread = std::thread(&ServerConnection::ThreadLoop, this);
     }
@@ -161,6 +180,7 @@ bool ServerConnection::Receive()
         return true;
     }
     else if (result < 0) {
+        Close();
         throw "Socket recv failed : " + std::to_string(WSAGetLastError());
     }
     else {
@@ -183,12 +203,13 @@ void ServerConnection::Close()
 {
     if (!active) return;
 
-    closesocket(connectionSocket);
     active = false;
+    closesocket(connectionSocket);
     if(dataBuffer!=nullptr)delete dataBuffer;
 }
 
 ServerConnection::~ServerConnection()
 {
     if (active) Close();
+    connectionThread.join();
 }

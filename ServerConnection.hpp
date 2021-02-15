@@ -19,6 +19,7 @@ private:
 
     SOCKET listenerSocket = INVALID_SOCKET;
     std::vector<ServerConnection*> connections;
+    std::vector<ServerConnection*> endedConnections;
 
     using ReceiveCallback = void(*)(ServerConnection* con);
     ReceiveCallback receiveCallback = nullptr;
@@ -59,6 +60,8 @@ private:
 public:
     ServerConnection(ServerConnectionHandler* handler);
     ~ServerConnection();
+
+    string ipAddress;
 
     bool IsActive() { return active; }
 public:

@@ -166,12 +166,22 @@ namespace MCP {
 
         uint32_t lightMask = c->GetPrimaryBitMask() << 1;
 
+        /*
         WriteVarInt(lightMask); // sky light mask
         WriteVarInt(lightMask); // block light mask
         WriteVarInt(lightMask ^ 0b111111111111111111); // empty sky light mask
         WriteVarInt(lightMask ^ 0b111111111111111111); // empty block light mask
 
         int sectionCount = c->GetSentSectionsCount();
+        */
+
+        //sending full bright for ALL of sections
+        WriteVarInt(0b111111111111111111); // sky light mask
+        WriteVarInt(0b111111111111111111); // block light mask
+        WriteVarInt(0); // empty sky light mask
+        WriteVarInt(0); // empty block light mask
+
+        int sectionCount = 18;
 
         // sky light
         for (int i = 0; i < sectionCount; i++) {

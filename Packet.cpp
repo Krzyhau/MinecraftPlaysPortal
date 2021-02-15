@@ -2,6 +2,8 @@
 
 #include "ServerConnection.hpp"
 
+#define MC_PACKET_BUFFER_SIZE 1024
+
 namespace MCP {
 
     Packet::Packet(int ID)
@@ -10,10 +12,7 @@ namespace MCP {
         , id(ID)
     {
         isWriter = true;
-        buffer = new char[MC_MAX_PACKET_SIZE];
-        for (int i = 0; i < MC_MAX_PACKET_SIZE; i++) {
-            buffer[i] = 0;
-        }
+        buffer = new char[MC_PACKET_BUFFER_SIZE] {0};
 
         WriteVarInt(ID);
     }
@@ -44,6 +43,7 @@ namespace MCP {
     }
     void Packet::WriteByte(uint8_t value)
     {
+        EnsureSpace(1);
         if (offset < MC_MAX_PACKET_SIZE) {
             buffer[offset] = value;
             offset++;
@@ -193,6 +193,7 @@ namespace MCP {
     void Packet::WriteNBT(NBTTag tag)
     {
         int nbtsize = tag.size();
+        EnsureSpace(nbtsize);
         if (offset + nbtsize < MC_MAX_PACKET_SIZE) {
             tag.WriteToBuffer(&buffer[offset]);
             offset += nbtsize;
@@ -208,6 +209,7 @@ namespace MCP {
 
     void Packet::WriteByteArray(char* array, int length)
     {
+        EnsureSpace(length);
         if (offset+length < MC_MAX_PACKET_SIZE) {
             memcpy(&buffer[offset], array, length);
             offset+=length;
@@ -258,13 +260,27 @@ namespace MCP {
         else return headerOffset + originalSize;
     }
 
+    int Packet::EnsureSpace(int space)
+    {
+        int prevSecCount = (offset / MC_PACKET_BUFFER_SIZE) + 1;
+        int newSecCount = ((offset + space) / MC_PACKET_BUFFER_SIZE) + 1;
+        if (prevSecCount != newSecCount) {
+            char* newBuffer = new char[MC_PACKET_BUFFER_SIZE * newSecCount];
+            memcpy(newBuffer, buffer, offset);
+            delete[] buffer;
+            buffer = newBuffer;
+        }
+        return newSecCount * MC_PACKET_BUFFER_SIZE;
+    }
+
     void Packet::SetSizeHeader()
     {
         if (!isWriter)return;
 
         // store original buffer somewhere else and create temp buffer
+        int bufferSize = EnsureSpace(5);
         char* oldbuffer = buffer;
-        buffer = new char[MC_MAX_PACKET_SIZE];
+        buffer = new char[bufferSize];
     
         // write the packet size (offset) to the beginning of the buffer
         int oldOffset = offset - headerOffset;
@@ -273,7 +289,7 @@ namespace MCP {
 
         // copy the memory to the original buffer
         memcpy(buffer + offset, oldbuffer + headerOffset, oldOffset);
-        delete oldbuffer;
+        delete[] oldbuffer;
 
         // store offset in header offset for later use
         headerOffset = offset;

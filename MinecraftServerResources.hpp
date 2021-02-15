@@ -46,7 +46,7 @@ namespace MCP {
     }
 
     static std::string GetServerFaviconBase64() {
-        return 
+        static string favicon =
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9TxSItCnYQ"
             "dchQnSyIijhKFYtgobQVWnUwufQLmjQkKS6OgmvBwY/FqoOLs64OroIg+AHi5uak6CIl/i8ptIjx4Lgf7+497t4BQqPCVLNrAlA1y0jFY2I2tyr2vEJAAC"
             "EMo19ipp5IL2bgOb7u4ePrXZRneZ/7c4SUvMkAn0g8x3TDIt4gntm0dM77xGFWkhTic+Jxgy5I/Mh12eU3zkWHBZ4ZNjKpeeIwsVjsYLmDWclQiaeJI4qq"
@@ -70,6 +70,7 @@ namespace MCP {
             "M/f/M9zbnsr47EqrQe2YtMMedbLjQCFU9gLrTKladQPUEECPwxrcgDUtgfwCMtFxpdsyVsZuczLxEiCYa8lYIIWzc34wRlbg3QPTkAcPhsEb56IxQ9zo8f"
             "5wrRPUI2PYVHcrZRem6Wx7p9wvYESfCVGv+W2JVfjR0+m5+2i2prL+AVjANLZFpgBOZ6r8f4fJZOC42eXXY8EftEYuwTQGT+/j9ikVGkd9CCqAAAAABJRU"
             "5ErkJggg==";
+        return favicon;
     }
 
     static string GetServerInfo(MinecraftConnection* con) {
@@ -90,38 +91,63 @@ namespace MCP {
         "}";
     }
 
-    static string HttpGetRequest(string address, string request) {
-        string output("");
+    // dumb fucking thing
+    static string HttpsGet(string request) {
+        // prepare CURL connection
+        CURL* req = curl_easy_init();
+        if (!req)return "";
 
-        addrinfo hints = {0}, * host;
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
+        curl_easy_setopt(req, CURLOPT_URL, request.c_str());
+        curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, TRUE);
 
-        int status = getaddrinfo(address.c_str(), "443", &hints, &host);
-        if(status != 0) return output;
+        // kill me
+        using CURL_WriteFunc = size_t(*)(void*, size_t, size_t, void*);
+        curl_easy_setopt(req, CURLOPT_WRITEFUNCTION,
+            (CURL_WriteFunc)([](void* ptr, size_t sz, size_t nmemb, void* data) -> size_t {
+                ((string*)data)->append((char*)ptr, sz * nmemb);
+                return sz * nmemb;
+                })
+        );
 
-        SOCKET webSock = socket(host->ai_family, host->ai_socktype, host->ai_protocol);
+        string response("");
+        curl_easy_setopt(req, CURLOPT_WRITEDATA, &response);
 
-        if (connect(webSock, host->ai_addr, host->ai_addrlen) != 0) {
-            return output;
-        }
-
-        string get_request("GET ");
-        get_request += request + " HTTP/1.1\r\nHost: " + address + "\r\nConnection: close\r\n\r\n";
-        send(webSock, get_request.c_str(), strlen(get_request.c_str()), 0);
-
-
-        char* buffer = new char[MC_MAX_PACKET_SIZE];
-        int dataSize = recv(webSock, buffer, 10000, 0);
         
-        if (dataSize > 0) {
-            output = string(buffer, dataSize);
+        CURLcode res = curl_easy_perform(req);
+        if (res != CURLE_OK) {
+            curl_easy_cleanup(req);
+            return "";
         }
 
-        closesocket(webSock);
-        freeaddrinfo(host);
-        delete[] buffer;
-        return output;
+        curl_easy_cleanup(req);
+        return response;
+    }
+
+    static string GetPlayerUUID(string playerName) {
+        //get players UUID
+        string playerdbAddr = "https://playerdb.co/api/player/minecraft/" + playerName;
+        string response = HttpsGet(playerdbAddr);
+
+        int rawIdPos = response.find("raw_id");
+        if (rawIdPos == std::string::npos) {
+            return "";
+        }
+
+        return response.substr(rawIdPos + 9, 32);
+    }
+
+    static string GetPlayerSkin(string uuid) {
+        
+        string mojangAddr = "https://sessionserver.mojang.com/session/minecraft/profile/" + uuid;
+        string response = HttpsGet(mojangAddr);
+
+        int texturePos = response.find("textures");
+        if (texturePos == std::string::npos) {
+            return "";
+        }
+
+        texturePos += 26;
+        return response.substr(texturePos, response.find('"', texturePos) - texturePos);
     }
 }

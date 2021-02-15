@@ -27,19 +27,13 @@ namespace MCP {
             least = leastHalf;
         }
 
-        std::string ToString() {
-            std::stringstream ss;
-
-            ss << std::hex;
-            for (int i = 0; i < 4; i++) {
-                uint32_t byte = parts[i];
-                for (int j = 0; j < 8; j++) {
-                    uint32_t value = ((byte >> ((7 - j) * 4)) & 0xF);
-                    ss << value;
-                }
-            }
-
-            return ss.str();
+        UUID(string uuidStr) {
+            int strSize = (int)uuidStr.size();
+            if (strSize < 32) uuidStr = string('0', 32-strSize) + uuidStr;
+            string mostStr = string("0x") + uuidStr.substr(0, 16);
+            string leastStr = string("0x") + uuidStr.substr(16, 16);
+            most = stoull(mostStr,nullptr,16);
+            least = stoull(leastStr,nullptr,16);
         }
     };
 
@@ -91,6 +85,7 @@ namespace MCP {
         void WriteByteArray(char* array, int length);
 
         int GetSize();
+        int EnsureSpace(int space);
         void SetSizeHeader();
         void Send(ServerConnection* con);
 

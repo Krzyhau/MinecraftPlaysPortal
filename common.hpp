@@ -7,6 +7,6 @@
 #include <iostream>
 #include <chrono>
 #include <cassert>
-#include <WS2tcpip.h>
+#include "curl/curl.h"
 
 using namespace std;
