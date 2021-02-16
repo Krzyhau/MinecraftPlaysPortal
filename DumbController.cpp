@@ -92,6 +92,8 @@ void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
                 if (i == Jump)input.jump = pressed;
                 if (i == Crouch)input.crouch = pressed;
                 if (i == Use)input.use = pressed;
+
+                digitalAnalogs[i - BluePortal] = avgX;
             }
             else { // analog input
                 if (i == MovementAnalog) {
@@ -136,5 +138,43 @@ void DumbController::SendDisplayPackets(MinecraftConnection* con, DumbInputType 
             bossBar.Send(con);
         }
         con->currentControllerZone = type;
+    }
+}
+
+// custom-made software can connect to the server as a data receiver
+// this function is used to generate data packets for them
+void DumbController::SendInputPackets(MinecraftConnection* con, bool detailed)
+{
+    if (detailed) {
+        MCP::Packet data(0x02);
+        data.WriteFloat(input.movementX);
+        data.WriteFloat(input.movementY);
+        data.WriteFloat(input.angleX);
+        data.WriteFloat(input.angleY);
+        for (int i = 0; i < 5; i++) {
+            data.WriteFloat(digitalAnalogs[i]);
+        }
+        data.WriteInt(playerCount);
+        for (int i = 1; i < DUMB_CONTROLLER_INPUT_COUNT; i++) {
+            data.WriteInt(categorizedConnections->size());
+        }
+
+        data.Send(con);
+    }
+    else {
+        MCP::Packet data(0x01);
+        data.WriteFloat(input.movementX);
+        data.WriteFloat(input.movementY);
+        data.WriteFloat(input.angleX);
+        data.WriteFloat(input.angleY);
+        data.WriteByte(input.bluePortal);
+        data.WriteByte(input.redPortal);
+        data.WriteByte(input.jump);
+        data.WriteByte(input.crouch);
+        data.WriteByte(input.use);
+        data.WriteByte(input.save);
+        data.WriteByte(input.load);
+
+        data.Send(con);
     }
 }

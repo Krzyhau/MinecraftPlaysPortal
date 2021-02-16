@@ -387,6 +387,19 @@ void MinecraftServer::Update()
     //update controller
     g_dumbController->ProcessClients(conInGame);
 
+    //quickly go over controller data connections to disable inactive ones
+    for (ServerConnection* con : socketHandler.GetConnections()) {
+        MinecraftConnection* mccon = (MinecraftConnection*)con;
+        if (!con->IsActive() || mccon->state != DATA) continue;
+        if (mccon->lastAliveVerified) {
+            mccon->lastAlive = now;
+            mccon->lastAliveVerified = false;
+        }
+        else if (mccon->lastAlive + 5000 < now) {
+            mccon->Close();
+        }
+    }
+
     //sleep to make server work in 20 ticks per second
     uint64_t nower = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
     int sleepDelay = (int)std::fmax(0, 50 - (nower - now));
@@ -409,15 +422,20 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
 
         //cout << "Packet ID " << inPacket.id << "(length " << inPacket.GetSize() << ", real length " << con->GetDataLength() << ")" << endl;
 
-        if (con->state == NONE && inPacket.id == 0x00) { // handshake
-            MCP::HandshakeInPacket handshake(buffer);
-            if (handshake.state == 1) con->state = STATUS;
-            else if (handshake.state == 2) con->state = LOGIN;
-            /*cout << dec << "Handshake -> " << "protocol=" << handshake.protocol;
-            cout << "   addr=" << handshake.address << ":" << handshake.port;
-            cout << "   state=" << handshake.state << endl;*/
+        if (con->state == NONE) { // handshake
+            if (inPacket.id == 0x00) { // default minecraft handshake
+                MCP::HandshakeInPacket handshake(buffer);
+                if (handshake.state == 1) con->state = STATUS;
+                else if (handshake.state == 2) con->state = LOGIN;
+                /*cout << dec << "Handshake -> " << "protocol=" << handshake.protocol;
+                cout << "   addr=" << handshake.address << ":" << handshake.port;
+                cout << "   state=" << handshake.state << endl;*/
 
-            con->protocolVer = handshake.protocol;
+                con->protocolVer = handshake.protocol;
+            }
+            if (inPacket.id == 0x01) { // special handshake for data receivers
+                con->state = DATA;
+            }
         }
         else if (con->state == STATUS) {
             if (inPacket.id == 0x00) { // request
@@ -583,6 +601,13 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
                 int mainHand = inPacket.ReadVarInt();
 
                 con->skinSettings = skinParts;
+            }
+        }
+        else if (con->state == DATA) {
+            con->lastAliveVerified = true;
+            if (inPacket.id == 0x00) {
+                bool detailed = inPacket.ReadByte() > 0;
+                g_dumbController->SendInputPackets(con, detailed);
             }
         }
     }

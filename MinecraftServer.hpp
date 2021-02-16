@@ -37,7 +37,8 @@ enum MinecraftConnectionState {
     NONE,
     STATUS,
     LOGIN,
-    PLAY
+    PLAY,
+    DATA
 };
 
 enum ChatMessageType {

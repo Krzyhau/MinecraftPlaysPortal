@@ -53,12 +53,15 @@ private:
     int playerCount = 0;
     vector<MinecraftConnection*> categorizedConnections[DUMB_CONTROLLER_INPUT_COUNT];
     DumbControllerInputs input;
+
+    float digitalAnalogs[5]; // peak of comedy.
 public:
     DumbController();
     
     void ProcessClients(vector<MinecraftConnection*> cons);
     void SendDisplayPackets(MinecraftConnection* con, DumbInputType type);
 
+    void SendInputPackets(MinecraftConnection* con, bool detailed);
 
     static DumbControllerZone zones[DUMB_CONTROLLER_INPUT_COUNT];
     static string inputColors[DUMB_CONTROLLER_INPUT_COUNT];
