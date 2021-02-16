@@ -290,6 +290,15 @@ void MinecraftServer::Update()
                 oldPlayerEntity.WriteByte(0);
                 oldPlayerEntity.Send(con);
 
+                // and sending their skins to the newcomer
+                MCP::Packet entMetadata(0x44);
+                entMetadata.WriteVarInt(con2->entityId);
+                entMetadata.WriteByte(16);
+                entMetadata.WriteVarInt(0);
+                entMetadata.WriteVarInt(con2->skinSettings);
+                entMetadata.WriteByte(0xff);
+                entMetadata.Send(con);
+
                 // but also creating a newcomer entity for all players
                 newPlayerEntity.Send(con2);
             }
@@ -350,6 +359,22 @@ void MinecraftServer::Update()
                 entMetadata.Send(con2);
             }
             con->crouchingState = (con->crouchingState & 1);
+        }
+
+        // handle skins
+        if (con->skinSettings != con->oldSkinSettings) {
+            MCP::Packet entMetadata(0x44);
+            entMetadata.WriteVarInt(con->entityId);
+
+            entMetadata.WriteByte(16);
+            entMetadata.WriteVarInt(0);
+            entMetadata.WriteVarInt(con->skinSettings);
+            entMetadata.WriteByte(0xff);
+
+            for (MinecraftConnection* con2 : conInGame) {
+                entMetadata.Send(con2);
+            }
+            con->oldSkinSettings = con->skinSettings;
         }
         
 
@@ -546,6 +571,18 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
             if (inPacket.id == 0x2C) {
                 int hand = inPacket.ReadVarInt();
                 con->handAnimState = hand + 1;
+            }
+
+            // client settings
+            if (inPacket.id == 0x05) {
+                string locale = inPacket.ReadString();
+                uint8_t viewDistance = inPacket.ReadByte();
+                int chatMode = inPacket.ReadVarInt();
+                bool colors = inPacket.ReadByte();
+                uint8_t skinParts = inPacket.ReadByte();
+                int mainHand = inPacket.ReadVarInt();
+
+                con->skinSettings = skinParts;
             }
         }
     }

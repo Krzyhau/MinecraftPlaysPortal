@@ -30,7 +30,11 @@ DumbController::DumbController()
 void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
 {
     playerCount = cons.size();
-    vector<MinecraftConnection*> categorizedCons[DUMB_CONTROLLER_INPUT_COUNT];
+    
+    for (int i = 0; i < DUMB_CONTROLLER_INPUT_COUNT; i++) {
+        categorizedConnections[i].clear();
+    }
+
     
     for (MinecraftConnection* con : cons) {
         bool categoryFound = false;
@@ -39,19 +43,18 @@ void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
             DumbControllerZone zone = zones[i];
             if (pos.x >= zone.minX && pos.x <= zone.maxX
              && pos.z >= zone.minZ && pos.z <= zone.maxZ && abs(pos.y-zone.y)<0.1) {
-                categorizedCons[i].push_back(con);
+                categorizedConnections[i].push_back(con);
                 categoryFound = true;
                 break;
             }
         }
         if (!categoryFound) {
-            categorizedCons[0].push_back(con);
+            categorizedConnections[0].push_back(con);
         }
     }
 
     for (int i = 0; i < DUMB_CONTROLLER_INPUT_COUNT; i++) {
-        vector<MinecraftConnection*> cat = categorizedCons[i];
-        inputPlayerCount[i] = cat.size();
+        vector<MinecraftConnection*> cat = categorizedConnections[i];
         if (i >= Save) {
             float percentage = cat.size() / (float)cons.size();
             bool pressed = (percentage >= 0.5);
@@ -67,12 +70,20 @@ void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
             float sumX = 0, sumZ = 0;
 
             for (MinecraftConnection* con : cat) {
-                sumX += con->position.x;
-                sumZ += con->position.z;
+                if (i >= BluePortal) {
+                    sumZ += ((con->position.z > midZ) ? zones[i].maxZ : zones[i].minZ) - midZ;
+                }
+                else {
+                    sumX += con->position.x - midX;
+                    sumZ += con->position.z - midZ;
+                }
             }
+            float avgX = 0, avgZ = 0;
 
-            float avgX = fminf(fmaxf((((sumX / cat.size()) - midX) / divX),-1.0f),1.0f);
-            float avgZ = fminf(fmaxf((((sumZ / cat.size()) - midZ) / divZ),-1.0f),1.0f);
+            if (cat.size() > 0) {
+                avgX = fminf(fmaxf((((sumX / cat.size())) / divX), -1.0f), 1.0f);
+                avgZ = fminf(fmaxf((((sumZ / cat.size())) / divZ), -1.0f), 1.0f);
+            }
 
             if (i >= BluePortal) { // "digital" input
                 bool pressed = (avgX > 0.5);
@@ -97,10 +108,14 @@ void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
             SendDisplayPackets(con, (DumbInputType)i);
         }
     }
+
+    //cout << "movX:" << input.movementX << "   movY:" << input.movementY << endl;
 }
 
+// send packets to represent data visually for clients (boss bar)
 void DumbController::SendDisplayPackets(MinecraftConnection* con, DumbInputType type)
 {
+    //update boss bar
     if (con->currentControllerZone != type) {
         MCP::Packet removeBossBar(0x0C);
         removeBossBar.WriteUUID({ 0,69 });

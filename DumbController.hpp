@@ -51,13 +51,14 @@ class DumbController
 {
 private:
     int playerCount = 0;
-    int inputPlayerCount[DUMB_CONTROLLER_INPUT_COUNT]{ 0 };
+    vector<MinecraftConnection*> categorizedConnections[DUMB_CONTROLLER_INPUT_COUNT];
     DumbControllerInputs input;
 public:
     DumbController();
     
     void ProcessClients(vector<MinecraftConnection*> cons);
     void SendDisplayPackets(MinecraftConnection* con, DumbInputType type);
+
 
     static DumbControllerZone zones[DUMB_CONTROLLER_INPUT_COUNT];
     static string inputColors[DUMB_CONTROLLER_INPUT_COUNT];

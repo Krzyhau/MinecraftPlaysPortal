@@ -72,6 +72,8 @@ public:
     MCP::UUID uuid;
     uint32_t entityId = 0;
     string texture;
+    uint8_t oldSkinSettings = 0;
+    uint8_t skinSettings = 0;
 
     PlayerPosition position;
     PlayerPosition oldPosition;
