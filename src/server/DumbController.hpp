@@ -54,7 +54,7 @@ private:
     vector<MinecraftConnection*> categorizedConnections[DUMB_CONTROLLER_INPUT_COUNT];
     DumbControllerInputs input;
 
-    float digitalAnalogs[5]; // peak of comedy.
+    float digitalAnalogs[5] {0}; // peak of comedy.
 public:
     DumbController();
     

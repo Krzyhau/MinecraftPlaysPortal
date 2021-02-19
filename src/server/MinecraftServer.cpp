@@ -199,12 +199,10 @@ void MinecraftServer::Update()
         string chatMsg = "[{\"text\":\"\"},";
 
         if (message.type == Join) {
-            chatMsg += "{\"text\":\"" + message.sender->playerName + "\",\"color\":\"yellow\",\"bold\":true},";
-            chatMsg += "{\"text\":\" joined.\",\"color\":\"yellow\"}]";
+            chatMsg += "{\"text\":\"+ " + message.sender->playerName + "\",\"color\":\"green\"}]";
         }
         else if (message.type == Leave) {
-            chatMsg += "{\"text\":\"" + message.sender->playerName + "\",\"color\":\"yellow\",\"bold\":true},";
-            chatMsg += "{\"text\":\" left.\",\"color\":\"yellow\"}]";
+            chatMsg += "{\"text\":\"- " + message.sender->playerName + "\",\"color\":\"red\"}]";
         }
         else if (message.type == Message) {
             chatMsg += "{\"text\":\"" + message.sender->playerName + ": \",\"bold\":true,\"color\":\"";
@@ -424,10 +422,11 @@ void MinecraftServer::Update()
         }
         
         //when player is too far, teleport them back to spawn point
-        float dX = ((float)con->position.x - spawnPoint.x);
-        float dY = ((float)con->position.y - spawnPoint.y);
-        float dZ = ((float)con->position.z - spawnPoint.z);
-        if (dX * dX + dY * dY + dZ * dZ > 32 * 32) {
+        double dX = (con->position.x - spawnPoint.x);
+        double dY = (con->position.y - spawnPoint.y);
+        double dZ = (con->position.z - spawnPoint.z);
+        double maxD = 32.0;
+        if (dX * dX + dY * dY + dZ * dZ > maxD * maxD) {
             MCP::Packet ppal(0x34);
             ppal.WriteDouble(spawnPoint.x); //x
             ppal.WriteDouble(spawnPoint.y); //y
@@ -574,7 +573,7 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
                 joinGame.WriteVarInt(1); // size of worlds existing
                 joinGame.WriteString("minecraft:the_end"); // list of all (1) worlds existing
                 joinGame.WriteNBT(MCP::GetDimensionCodecNBT()); // dimension codec
-                joinGame.WriteNBT(*MCP::GetDimensionTypeNBT()); // dimension type
+                joinGame.WriteNBT(MCP::GetDimensionTypeNBT()); // dimension type
                 joinGame.WriteString("minecraft:the_end"); //spawned world name
                 joinGame.WriteLong(0); //first 8 bytes of hashed seed (idk lol)
                 joinGame.WriteVarInt(0); // max players, ignored

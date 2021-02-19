@@ -7,24 +7,33 @@
 #include "curl/curl.h"
 
 namespace MCP {
-    // could technically get that from the file
-    static NBTTag* GetDimensionTypeNBT() {
-        return NBTTag::List("element", TAG_Compound, {
-            NBTTag::Byte("piglin_safe",0),
-            NBTTag::Byte("natural",0),
-            NBTTag::Float("ambient_light",0.0f),
-            NBTTag::String("infiniburn","minecraft:infiniburn_end"),
-            NBTTag::Byte("respawn_anchor_works", 0),
-            NBTTag::Byte("has_skylight",0),
-            NBTTag::Byte("bed_works",0),
-            NBTTag::String("effects","minecraft:the_end"),
-            NBTTag::Byte("has_raids",1),
-            NBTTag::Int("logical_height",256),
-            NBTTag::Double("coordinate_scale",1.0),
-            NBTTag::Byte("ultrawarm",0),
-            NBTTag::Byte("has_ceiling",0),
-            NBTTag::Int("fixed_time",6000),
-        });
+    static NBTTag GetDimensionTypeNBT() {
+        static NBTTag nbt;
+        static bool created = false;
+        if (!created) {
+            NBTTag* tempNBT = NBTTag::List("element", TAG_Compound, {
+                NBTTag::Byte("piglin_safe",0),
+                NBTTag::Byte("natural",0),
+                NBTTag::Float("ambient_light",0.0f),
+                NBTTag::String("infiniburn","minecraft:infiniburn_end"),
+                NBTTag::Byte("respawn_anchor_works", 0),
+                NBTTag::Byte("has_skylight",0),
+                NBTTag::Byte("bed_works",0),
+                NBTTag::String("effects","minecraft:the_end"),
+                NBTTag::Byte("has_raids",1),
+                NBTTag::Int("logical_height",256),
+                NBTTag::Double("coordinate_scale",1.0),
+                NBTTag::Byte("ultrawarm",0),
+                NBTTag::Byte("has_ceiling",0),
+                NBTTag::Int("fixed_time",6000),
+            });
+            char* buffer = new char[tempNBT->size()];
+            tempNBT->WriteToBuffer(buffer);
+            delete tempNBT;
+            nbt = NBTTag(buffer, true);
+            created = true;
+        }
+        return nbt;
     }
     static NBTTag GetDimensionCodecNBT() {
         //storing the tag in a static pointer
