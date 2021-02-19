@@ -13,7 +13,7 @@ DumbControllerZone DumbController::zones[DUMB_CONTROLLER_INPUT_COUNT] = {
     {9,2,13,4,2,R"( {"text":"Blue Portal Input","bold":"true","color":"aqua"} )",1}, // blue portal
     {9,5,13,7,2,R"( {"text":"Orange Portal Input","bold":"true","color":"gold"} )",2}, // orange portal
     {9,9,13,11,2,R"( {"text":"Jump Input","bold":"true","color":"green"} )",3}, // jump
-    {9,12,13,14,2,R"( {"text":"Crouch Input","bold":"true","color":"dark_purple"} )",5}, // crouch
+    {9,12,13,14,2,R"( {"text":"Duck Input","bold":"true","color":"dark_purple"} )",5}, // crouch
     {9,15,13,17,2,R"( {"text":"Use Input","bold":"true","color":"yellow"} )",4}, // use
     {6,8,7,9,2,R"( {"text":"Save Input","bold":"true","color":"gray"} )",6}, // save
     {6,10,7,11,2,R"( {"text":"Load Input","bold":"true","color":"dark_gray"} )",6} // load
@@ -74,8 +74,8 @@ void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
                     sumX += ((con->position.x > midX) ? zones[i].maxX : zones[i].minX) - midX;
                 }
                 else {
-                    sumX += con->position.x - midX;
-                    sumZ += con->position.z - midZ;
+                    sumX += (float)con->position.x - midX;
+                    sumZ += (float)con->position.z - midZ;
                 }
             }
             float avgX = 0, avgZ = 0;

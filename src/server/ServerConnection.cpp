@@ -109,6 +109,15 @@ void ServerConnectionHandler::HandleReceive(ServerConnection* con)
     }
 }
 
+void ServerConnectionHandler::HandleError(ServerConnection* con, string error) {
+    if (errorCallback) {
+        errorCallback(con, error);
+    }
+    else {
+        std::cerr << error << std::endl;
+    }
+}
+
 ServerConnectionHandler::~ServerConnectionHandler()
 {
     if (active) Close();
@@ -156,7 +165,7 @@ void ServerConnection::ThreadLoop() {
         }
     }
     catch (std::string err) {
-        std::cerr << err << std::endl;
+        socketHandler->HandleError(this, err);
         Close();
     }
 }

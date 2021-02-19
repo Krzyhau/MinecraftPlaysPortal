@@ -23,6 +23,10 @@ private:
 
     using ReceiveCallback = void(*)(ServerConnection* con);
     ReceiveCallback receiveCallback = nullptr;
+
+    //i know, it's bad, but im too lazy to make it better
+    using ErrorCallback = void(*)(ServerConnection* con, string error);
+    ErrorCallback errorCallback = nullptr;
 public:
     ServerConnectionHandler();
     ~ServerConnectionHandler();
@@ -38,7 +42,9 @@ public:
     bool HasNewConnection();
 
     void SetReceiveCallback(ReceiveCallback callback) { receiveCallback = callback; }
+    void SetErrorCallback(ErrorCallback callback) { errorCallback = callback; }
     void HandleReceive(ServerConnection* con);
+    void HandleError(ServerConnection* con, string error);
 
     SOCKET GetListenerSocket() { return listenerSocket; }
     vector<ServerConnection*> GetConnections() { return connections; }

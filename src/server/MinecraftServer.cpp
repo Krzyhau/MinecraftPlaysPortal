@@ -16,7 +16,8 @@ ChunkWorld* gWorld = new ChunkWorld();
 
 MinecraftServer::MinecraftServer()
 {
-
+    spawnPoint = { 3,2,9.5,-90,0,false };
+    requiredProtocol = 754; // 1.16.4 or 1.16.5
 }
 
 MinecraftServer::~MinecraftServer()
@@ -27,22 +28,34 @@ MinecraftServer::~MinecraftServer()
 
 void MinecraftServer::Start()
 {
-    cout << "\"Minecraft Plays Portal 2\" custom bong server!!!!" << endl << endl;
+    cout << "[SERVER] " << "\"Minecraft Plays Portal 2\" custom bong server!!!!" << endl;
 
-    cout << "Loading dimension codec..." << endl;
+    cout << "[SERVER] " << "Loading dimension codec..." << endl;
     NBTTag codec = MCP::GetDimensionCodecNBT();
 
-    cout << "Creating world... " << endl;
+    cout << "[SERVER] " << "Creating world... " << endl;
     CreateWorld();
 
-    cout << "Initializing socket handler... " << endl;
+    cout << "[SERVER] " << "Initializing socket handler... " << endl;
     socketHandler.Initialize();
 
     socketHandler.SetReceiveCallback([](ServerConnection * con) {
         gMCServer->OnPacketReceive((MinecraftConnection*)con); // thats soo bad lol
     });
 
-    cout << "Server is active. Running in a loop..." << endl;
+    socketHandler.SetErrorCallback([](ServerConnection* con, string error) {
+        cout << "[SERVER] ";
+        MinecraftConnection* mccon = (MinecraftConnection*)con;
+        if (mccon->state == DATA) {
+            cout << mccon->ipAddress;
+        }
+        else {
+            cout << mccon->playerName << "(" << mccon->ipAddress << ")";
+        }
+        cout << " disconnected (" << error << ")" << endl;
+    });
+
+    cout << "[SERVER] " << "Server is active. Running in a loop..." << endl;
     while (socketHandler.IsActive()) {
         Update();
     }
@@ -137,7 +150,7 @@ void MinecraftServer::Update()
             conInGame.push_back(mccon);
         }
     }
-
+    playerCount = conInGame.size();
 
     // clean connections that have already ended
     socketHandler.CheckConnections();
@@ -161,7 +174,7 @@ void MinecraftServer::Update()
         for (MinecraftConnection* leavingCon : conLeavingGame) {
             // add leaving message
             chatMessages.push_back({ leavingCon, Leave });
-            cout << leavingCon->playerName << " left the server." << endl;
+            cout << "[SERVER] " << leavingCon->playerName << "(" << leavingCon->ipAddress << ") disconnected from the game." << endl;
 
             // send remove player packet for player info
             leavingPlayersInfo.WriteUUID(leavingCon->uuid);
@@ -200,6 +213,11 @@ void MinecraftServer::Update()
         }
 
         chatMsgBuffer.push_back(chatMsg);
+
+        if (message.type == Message) {
+            cout << "[CHAT] " << message.sender->playerName << ": " << message.message << endl;
+        }
+        
     }
     chatMessages.clear();
 
@@ -214,10 +232,10 @@ void MinecraftServer::Update()
                 keepAlive.Send(con);
             }
             else {
-                MCP::Packet disconnect(0x00);
+                MCP::Packet disconnect(0x19);
                 disconnect.WriteString(R"( {"text":"Timed out.","bold":"true"} )");
                 disconnect.Send(con);
-                cout << con->playerName << " timed out." << endl;
+                cout << "[SERVER] " << con->playerName << "(" << con->ipAddress << ") timed out." << endl;
                 con->Close();
             }
         }
@@ -303,6 +321,34 @@ void MinecraftServer::Update()
                 newPlayerEntity.Send(con2);
             }
 
+            //EXACTLY the same thing as above, but for teams and collision system
+            MCP::Packet teamAdd(0x4C);
+            teamAdd.WriteString("nocol");
+            teamAdd.WriteByte(3);
+            teamAdd.WriteVarInt(1);
+            teamAdd.WriteString(con->playerName);
+
+            MCP::Packet teamCreate(0x4C);
+            teamCreate.WriteString("nocol");
+            teamCreate.WriteByte(0);
+            teamCreate.WriteString("\"\""); // team display name
+            teamCreate.WriteByte(0);
+            teamCreate.WriteString("always"); // name visibility string enum
+            teamCreate.WriteString("never"); // collision rule string enum (!)
+            teamCreate.WriteVarInt(15);
+            teamCreate.WriteString("\"\""); // prefix
+            teamCreate.WriteString("\"\""); // suffix
+            teamCreate.WriteVarInt(conInGame.size()); // num of players (adding them all, including itself)
+            for (MinecraftConnection* con2 : conInGame) {
+                //sending the newcomer all the players
+                teamCreate.WriteString(con2->playerName);
+
+                //but also sending to all players info of the newcomer
+                if (con == con2)continue;
+                teamAdd.Send(con2);
+            }
+            teamCreate.Send(con);
+
             con->joined = true;
         }
 
@@ -377,6 +423,22 @@ void MinecraftServer::Update()
             con->oldSkinSettings = con->skinSettings;
         }
         
+        //when player is too far, teleport them back to spawn point
+        float dX = ((float)con->position.x - spawnPoint.x);
+        float dY = ((float)con->position.y - spawnPoint.y);
+        float dZ = ((float)con->position.z - spawnPoint.z);
+        if (dX * dX + dY * dY + dZ * dZ > 32 * 32) {
+            MCP::Packet ppal(0x34);
+            ppal.WriteDouble(spawnPoint.x); //x
+            ppal.WriteDouble(spawnPoint.y); //y
+            ppal.WriteDouble(spawnPoint.z); //z
+            ppal.WriteFloat(spawnPoint.yaw); //yaw
+            ppal.WriteFloat(spawnPoint.pitch); //pitch
+            ppal.WriteByte(0); //relative teleportation flags
+            ppal.WriteVarInt(69); //teleport id, client should resend Teleport Confirm (0x00) with this number
+            ppal.Send(con);
+            con->position = spawnPoint;
+        }
 
         //cout << "x:" << con->position.x << ", y:" << con->position.y << ", z:" << con->position.z << ", yaw:" << con->position.yaw << ", pitch:" << con->position.pitch << ", onGround:" << con->position.onGround << endl;
     }
@@ -408,6 +470,9 @@ void MinecraftServer::Update()
 
 
 
+
+
+
 void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
 
     // data buffer can contain multiple packets. read all of them
@@ -435,6 +500,7 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
             }
             if (inPacket.id == 0x68) { // special handshake for data receivers
                 con->state = DATA;
+                cout << "[SERVER] " << con->ipAddress << " connected as controller data receiver." << endl;
             }
         }
         else if (con->state == STATUS) {
@@ -459,8 +525,16 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
                 string playerName = inPacket.ReadString();
                 con->playerName = playerName;
                 
+                // if invalid protocol version, disconnect right away!
+                if (con->protocolVer != requiredProtocol) {
+                    MCP::Packet disconnect(0x00);
+                    disconnect.WriteString(R"( {"text":"Invalid version. Please use 1.16.4 or 1.16.5."} )");
+                    disconnect.Send(con);
+                    con->Close();
+                    return;
+                }
 
-                cout << playerName << "(" << con->ipAddress << ") attempts to join the server." << endl;
+                cout << "[SERVER] " << playerName << "(" << con->ipAddress << ") attempts to join the server as a player." << endl;
 
                 // getting minecraft skin for given nickname
                 string uuidStr = MCP::GetPlayerUUID(playerName);
@@ -471,7 +545,6 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
                 }
                 else {
                     // do this weird shit if non-existing, just to make UUID unique for a player
-
                     uint64_t uniqueId1 = 0, uniqueId2 = playerName.length();
                     uniqueId2 = uniqueId2 << 32;
                     for (char& c : playerName) {
@@ -479,7 +552,6 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
                         uniqueId1 += c;
                         uniqueId2 += c;
                     }
-
                     // ???????????
                     uniqueId1 = (uniqueId1 ^ 0x1000) | 0x3000;
 
@@ -522,7 +594,7 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
                     MCP::FullBrightLightChunkPacket fullBright(chunk);
                     fullBright.Send(con);
                 }
-                con->position = { 4.5,5,4.5,0,0,false };
+                con->position = spawnPoint;
 
                 //send "Player Position And Look" packet
                 MCP::Packet ppal(0x34);
@@ -537,12 +609,12 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
 
                 // send joining message
                 chatMessages.push_back({ con, Join });
-                cout << playerName << " joined the server successfully." << endl;
+                cout << "[SERVER] " << playerName << "(" << con->ipAddress << ") joined the server successfully." << endl;
 
                 con->state = PLAY;
 
 
-                cout << "Aktywne polaczenia: " << socketHandler.GetConnections().size() << endl;
+                cout << "[SERVER] " << "Active connections: " << socketHandler.GetConnections().size() << endl;
             }
         }
         else if (con->state == PLAY) {

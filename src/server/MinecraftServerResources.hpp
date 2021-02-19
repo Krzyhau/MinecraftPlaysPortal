@@ -7,6 +7,7 @@
 #include "curl/curl.h"
 
 namespace MCP {
+    // could technically get that from the file
     static NBTTag* GetDimensionTypeNBT() {
         return NBTTag::List("element", TAG_Compound, {
             NBTTag::Byte("piglin_safe",0),
@@ -46,6 +47,7 @@ namespace MCP {
         return nbt;
     }
 
+    //64x64 png encoded in base64. i hate it.
     static std::string GetServerFaviconBase64() {
         static string favicon =
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9TxSItCnYQ"
@@ -79,11 +81,11 @@ namespace MCP {
         "{"
             "\"version\": {"
                 "\"name\": \"1.16.4\","
-                "\"protocol\": " + to_string(con->protocolVer) + ""
+                "\"protocol\": " + to_string(gMCServer->GetProtocol()) + ""
             "},"
             "\"players\": {"
                 "\"max\": -69,"
-                "\"online\": 0"
+                "\"online\": " + to_string(gMCServer->GetPlayerCount()) + ""
             "},"
             "\"description\": {"
                 "\"text\": \"Minecraft Plays Portal 2\""

@@ -96,7 +96,10 @@ class MinecraftServer {
 private:
     ServerConnectionHandler socketHandler;
     vector<ChatMessage> chatMessages;
+    PlayerPosition spawnPoint;
     int nextEntityId = 1;
+    int playerCount = 0;
+    int requiredProtocol;
 public:
     MinecraftServer();
     ~MinecraftServer();
@@ -105,6 +108,8 @@ public:
     
     void CreateWorld();
     uint32_t ReserveEntityID();
+    int GetPlayerCount() { return playerCount; }
+    int GetProtocol() { return requiredProtocol; }
 
     void Update();
     void OnPacketReceive(MinecraftConnection* con);
