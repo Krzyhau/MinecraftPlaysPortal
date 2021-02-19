@@ -1,8 +1,7 @@
 #include "Packet.hpp"
 
-#include "ServerConnection.hpp"
 
-#define MC_PACKET_BUFFER_SIZE 1024
+#define PACKET_BUFFER_SIZE 1024
 
 namespace MCP {
 
@@ -12,7 +11,7 @@ namespace MCP {
         , id(ID)
     {
         isWriter = true;
-        buffer = new char[MC_PACKET_BUFFER_SIZE] {0};
+        buffer = new char[PACKET_BUFFER_SIZE] {0};
 
         WriteVarInt(ID);
     }
@@ -44,10 +43,8 @@ namespace MCP {
     void Packet::WriteByte(uint8_t value)
     {
         EnsureSpace(1);
-        if (offset < MC_MAX_PACKET_SIZE) {
-            buffer[offset] = value;
-            offset++;
-        }
+        buffer[offset] = value;
+        offset++;
     }
 
     // short
@@ -115,22 +112,8 @@ namespace MCP {
         WriteLong(lValue);
     }
 
-    UUID Packet::ReadUUID()
-    {
-        UUID result(ReadLong(), ReadLong());
-        return result;
-    }
-
-    void Packet::WriteUUID(UUID uuid)
-    {
-        WriteLong(uuid.most);
-        WriteLong(uuid.least);
-    }
-
-
 
     // var int
-
     uint32_t Packet::ReadVarInt()
     {
         int numRead = 0;
@@ -184,22 +167,6 @@ namespace MCP {
         } while (var != 0);
     }
 
-    NBTTag Packet::ReadNBT()
-    {
-        NBTTag nbt(&buffer[offset]);
-        offset += nbt.size();
-        return nbt;
-    }
-    void Packet::WriteNBT(NBTTag tag)
-    {
-        int nbtsize = tag.size();
-        EnsureSpace(nbtsize);
-        if (offset + nbtsize < MC_MAX_PACKET_SIZE) {
-            tag.WriteToBuffer(&buffer[offset]);
-            offset += nbtsize;
-        }
-    }
-
     char* Packet::ReadByteArray(int length)
     {
         char* result = &buffer[offset];
@@ -210,10 +177,8 @@ namespace MCP {
     void Packet::WriteByteArray(char* array, int length)
     {
         EnsureSpace(length);
-        if (offset+length < MC_MAX_PACKET_SIZE) {
-            memcpy(&buffer[offset], array, length);
-            offset+=length;
-        }
+        memcpy(&buffer[offset], array, length);
+        offset+=length;
     }
 
     // string
@@ -262,15 +227,15 @@ namespace MCP {
 
     int Packet::EnsureSpace(int space)
     {
-        int prevSecCount = (offset / MC_PACKET_BUFFER_SIZE) + 1;
-        int newSecCount = ((offset + space) / MC_PACKET_BUFFER_SIZE) + 1;
+        int prevSecCount = (offset / PACKET_BUFFER_SIZE) + 1;
+        int newSecCount = ((offset + space) / PACKET_BUFFER_SIZE) + 1;
         if (prevSecCount != newSecCount) {
-            char* newBuffer = new char[MC_PACKET_BUFFER_SIZE * newSecCount];
+            char* newBuffer = new char[PACKET_BUFFER_SIZE * newSecCount];
             memcpy(newBuffer, buffer, offset);
             delete[] buffer;
             buffer = newBuffer;
         }
-        return newSecCount * MC_PACKET_BUFFER_SIZE;
+        return newSecCount * PACKET_BUFFER_SIZE;
     }
 
     void Packet::SetSizeHeader()
@@ -297,12 +262,16 @@ namespace MCP {
         // fix offset
         offset += oldOffset;
     }
-    
-    // sending packet for server connection. basically a wrapper for server connection function
-    void Packet::Send(ServerConnection* con) {
+
+    // sending packet for raw socket. 
+    void Packet::Send(SOCKET socket)
+    {
         // refresh size header with the size of currently possesed data
-        SetSizeHeader(); 
+        SetSizeHeader();
         // send the data
-        con->Send(GetBuffer(), GetSize());
+        int result = send(socket, (const char*)GetBuffer(), GetSize(), 0);
+        if (result == SOCKET_ERROR) {
+            throw "Socket send failed : " + std::to_string(WSAGetLastError());
+        }
     }
 }

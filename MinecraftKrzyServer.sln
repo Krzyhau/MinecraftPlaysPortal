@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.28803.352
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MinecraftKrzyServer", "src\server\MinecraftKrzyServer.vcxproj", "{BA6785C4-4F9E-45E2-B151-624F115A19A6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "datadisplay", "src\datadisplay\datadisplay.vcxproj", "{4731D47A-E187-4D05-BDF6-55C4A87EBD97}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{BA6785C4-4F9E-45E2-B151-624F115A19A6}.Release|x64.Build.0 = Release|x64
 		{BA6785C4-4F9E-45E2-B151-624F115A19A6}.Release|x86.ActiveCfg = Release|Win32
 		{BA6785C4-4F9E-45E2-B151-624F115A19A6}.Release|x86.Build.0 = Release|Win32
+		{4731D47A-E187-4D05-BDF6-55C4A87EBD97}.Debug|x64.ActiveCfg = Debug|x64
+		{4731D47A-E187-4D05-BDF6-55C4A87EBD97}.Debug|x64.Build.0 = Debug|x64
+		{4731D47A-E187-4D05-BDF6-55C4A87EBD97}.Debug|x86.ActiveCfg = Debug|Win32
+		{4731D47A-E187-4D05-BDF6-55C4A87EBD97}.Debug|x86.Build.0 = Debug|Win32
+		{4731D47A-E187-4D05-BDF6-55C4A87EBD97}.Release|x64.ActiveCfg = Release|x64
+		{4731D47A-E187-4D05-BDF6-55C4A87EBD97}.Release|x64.Build.0 = Release|x64
+		{4731D47A-E187-4D05-BDF6-55C4A87EBD97}.Release|x86.ActiveCfg = Release|Win32
+		{4731D47A-E187-4D05-BDF6-55C4A87EBD97}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

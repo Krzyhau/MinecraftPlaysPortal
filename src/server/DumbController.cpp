@@ -71,7 +71,7 @@ void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
 
             for (MinecraftConnection* con : cat) {
                 if (i >= BluePortal) {
-                    sumZ += ((con->position.z > midZ) ? zones[i].maxZ : zones[i].minZ) - midZ;
+                    sumX += ((con->position.x > midX) ? zones[i].maxX : zones[i].minX) - midX;
                 }
                 else {
                     sumX += con->position.x - midX;
@@ -156,7 +156,7 @@ void DumbController::SendInputPackets(MinecraftConnection* con, bool detailed)
         }
         data.WriteInt(playerCount);
         for (int i = 1; i < DUMB_CONTROLLER_INPUT_COUNT; i++) {
-            data.WriteInt(categorizedConnections->size());
+            data.WriteInt(categorizedConnections[i].size());
         }
 
         data.Send(con);

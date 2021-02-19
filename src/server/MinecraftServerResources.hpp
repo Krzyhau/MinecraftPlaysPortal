@@ -4,6 +4,7 @@
 #include "common.hpp"
 #include "NBT.hpp"
 #include <fstream>
+#include "curl/curl.h"
 
 namespace MCP {
     static NBTTag* GetDimensionTypeNBT() {

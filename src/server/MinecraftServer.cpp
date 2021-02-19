@@ -433,7 +433,7 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
 
                 con->protocolVer = handshake.protocol;
             }
-            if (inPacket.id == 0x01) { // special handshake for data receivers
+            if (inPacket.id == 0x68) { // special handshake for data receivers
                 con->state = DATA;
             }
         }
@@ -605,7 +605,7 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
         }
         else if (con->state == DATA) {
             con->lastAliveVerified = true;
-            if (inPacket.id == 0x00) {
+            if (inPacket.id == 0x69) {
                 bool detailed = inPacket.ReadByte() > 0;
                 g_dumbController->SendInputPackets(con, detailed);
             }
