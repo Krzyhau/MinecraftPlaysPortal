@@ -14,6 +14,8 @@ using namespace std;
 static DumbControllerData drawData;
 static float saveInterp = 0;
 static float loadInterp = 0;
+static bool ending = false;
+
 
 void WindowDisplay() {
 
@@ -101,6 +103,12 @@ void WindowDisplay() {
     DrawRectangle(7.6, 3.1, 3.8, 0.6, Color(40, 10, 10));
     DrawRectangle(7.6, 3.1, 3.8 * loadInterp, 0.6, Color(20, 200, 20));
 
+    if (!g_dataReceiver->IsActive()) {
+        DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, Color(50, 50, 50, 200));
+        Print(6, 8.1, Color(25, 0, 0), "Connecting to server...");
+        Print(6, 8.2, Color(255, 0, 0), "Connecting to server...");
+    }
+
     glFlush();
 }
 
@@ -110,6 +118,8 @@ void WindowInit() {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluOrtho2D(0.0, WINDOW_WIDTH, 0.0, WINDOW_HEIGHT);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void WindowResize(int width, int height) {
@@ -124,17 +134,21 @@ void WindowTimer(int value)
 
 
 void DataReceiveLoop() {
-    try {
-        g_dataReceiver->Initialize();
-        cout << "connected" << endl;
-        while (g_dataReceiver->IsActive()) {
-            g_dataReceiver->ReceiveData();
-            this_thread::sleep_for(50ms);
+    while (!ending) {
+        try {
+            g_dataReceiver->Initialize();
+            cout << "connected" << endl;
+            while (g_dataReceiver->IsActive()) {
+                g_dataReceiver->ReceiveData();
+                this_thread::sleep_for(50ms);
+            }
+            g_dataReceiver->Disable();
         }
-    }
-    catch (string s) {
-        cout << s;
-        g_dataReceiver->Disable();
+        catch (string err) {
+            cout << err << endl;
+            g_dataReceiver->Disable();
+        }
+        this_thread::sleep_for(1000ms);
     }
 }
 
@@ -153,4 +167,8 @@ int main(int argc, char** argv) {
 
     BuildFont(30, "D-DIN");
     glutMainLoop();
+
+    g_dataReceiver->Disable();
+    ending = false;
+    return 0;
 }

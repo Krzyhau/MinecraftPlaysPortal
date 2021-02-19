@@ -4,6 +4,8 @@
 #include <ws2tcpip.h>
 #include <string>
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 using namespace std;
 
@@ -18,7 +20,7 @@ DataReceiver::DataReceiver()
 
 DataReceiver::~DataReceiver()
 {
-
+    Disable();
 }
 
 void DataReceiver::Initialize()
@@ -27,10 +29,6 @@ void DataReceiver::Initialize()
 
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
         throw "WSA Startup failed : " + std::to_string(WSAGetLastError());
-    }
-
-    if ((clientSocket = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
-        throw "Socket creation failed : " + std::to_string(WSAGetLastError());
     }
 
     addrinfo hints, * result;
@@ -42,18 +40,22 @@ void DataReceiver::Initialize()
     if (getaddrinfo("127.0.0.1", "25565", &hints, &result) != 0) {
         throw "GetAddrInfo failed : " + std::to_string(WSAGetLastError());
     }
-
-    if ((clientSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol)) == INVALID_SOCKET) {
-        throw "Socket creation failed : " + std::to_string(WSAGetLastError());
-    }
-
-    active = true;
-
-    if (connect(clientSocket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR) {
-        throw "Socket connection failed : " + std::to_string(WSAGetLastError());
+    
+    while (clientSocket == INVALID_SOCKET) {
+        if ((clientSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol)) == INVALID_SOCKET) {
+            throw "Socket creation failed : " + std::to_string(WSAGetLastError());
+        }
+        if (connect(clientSocket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR) {
+            closesocket(clientSocket);
+            clientSocket = INVALID_SOCKET;
+            this_thread::sleep_for(1000ms);
+            continue;
+        }
     }
 
     freeaddrinfo(result);
+
+    active = true;
     
     // send handshake packet
     MCP::Packet handshake(0x68);
@@ -112,5 +114,6 @@ void DataReceiver::Disable()
 
     active = false;
     closesocket(clientSocket);
+    clientSocket = INVALID_SOCKET;
     WSACleanup();
 }
