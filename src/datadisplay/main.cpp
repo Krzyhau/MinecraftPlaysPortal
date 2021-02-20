@@ -115,7 +115,8 @@ void WindowDisplay() {
         Print(6, 8.2, Color(255, 0, 0), "Connecting to server...");
     }
 
-    glFlush();
+    glutSwapBuffers();
+    glutPostRedisplay();
 }
 
 void WindowInit() {
@@ -132,12 +133,6 @@ void WindowResize(int width, int height) {
     glutReshapeWindow(WINDOW_WIDTH * 40, WINDOW_HEIGHT * 40);
 }
 
-void WindowTimer(int value)
-{
-    glutTimerFunc(16, WindowTimer, 0);
-    glutPostRedisplay();
-}
-
 
 void DataReceiveLoop() {
     while (!ending) {
@@ -150,7 +145,7 @@ void DataReceiveLoop() {
                 auto currTime = chrono::system_clock::now();
 
                 auto sleepTime = 50ms - (currTime - prevTime);
-                if (sleepTime < 1ms)sleepTime = 1ms;
+                if (sleepTime < 5ms)sleepTime = 5ms;
                 this_thread::sleep_for(sleepTime);
             }
             g_dataReceiver->Disable();
@@ -184,11 +179,10 @@ int __stdcall WinMain(
     int argc = 1;
     const char* argv[1] = {" "};
     glutInit(&argc, (char**)argv);
-    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_MULTISAMPLE);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_MULTISAMPLE);
     glutInitWindowSize(WINDOW_WIDTH * 40, WINDOW_HEIGHT * 40);
     glutInitWindowPosition(0, 0);
     glutCreateWindow("MinecraftKrzyServer Data Display");
-    glutTimerFunc(0, WindowTimer, 0);
     glutDisplayFunc(WindowDisplay);
     WindowInit();
     glutReshapeFunc(WindowResize);
