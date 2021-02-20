@@ -190,13 +190,26 @@ void MinecraftServer::Update()
         }
     }
 
-    
-
-
     // converting all chat messages into strings
     vector<string> chatMsgBuffer;
     for (ChatMessage& message : chatMessages) {
         string chatMsg = "[{\"text\":\"\"},";
+
+        // stringify the string message for proper json format
+        // avoiding fucking crash caused by posting SINGULAR quotation mark wtf
+        string fixedMsg = "";
+        for (const char& c : message.message) {
+            switch(c){
+                case 0x08: fixedMsg += "\\b"; break;
+                case 0x0C: fixedMsg += "\\f"; break;
+                case 0x0A: fixedMsg += "\\n"; break;
+                case 0x0D: fixedMsg += "\\r"; break;
+                case 0x09: fixedMsg += "\\t"; break;
+                case 0x22: fixedMsg += "\\\""; break;
+                case 0x5C: fixedMsg += "\\\\"; break;
+                default: fixedMsg += c;
+            }
+        }
 
         if (message.type == Join) {
             chatMsg += "{\"text\":\"+ " + message.sender->playerName + "\",\"color\":\"green\"}]";
@@ -207,13 +220,13 @@ void MinecraftServer::Update()
         else if (message.type == Message) {
             chatMsg += "{\"text\":\"" + message.sender->playerName + ": \",\"bold\":true,\"color\":\"";
             chatMsg += DumbController::inputColors[message.sender->currentControllerZone];
-            chatMsg += "\"},{\"text\":\"" + message.message + "\"}]";
+            chatMsg += "\"},{\"text\":\"" + fixedMsg + "\"}]";
         }
 
         chatMsgBuffer.push_back(chatMsg);
 
         if (message.type == Message) {
-            cout << "[CHAT] " << message.sender->playerName << ": " << message.message << endl;
+            cout << "[CHAT] " << message.sender->playerName << ": " << fixedMsg << endl;
         }
         
     }
@@ -249,6 +262,20 @@ void MinecraftServer::Update()
 
         // handle joining
         if (!con->joined) {
+            // send joining message
+            chatMessages.push_back({ con, Join });
+            cout << "[SERVER] " << con->playerName << "(" << con->ipAddress << ") joined the server successfully." << endl;
+            cout << "[SERVER] " << "Active connections: " << socketHandler.GetConnections().size() << endl;
+
+            // remove duplicates (no fucking clue where they come from, but lets hope that fixes it)
+            for (MinecraftConnection* con2 : conInGame) {
+                if (con2 != con && con->ipAddress == con2->ipAddress && con->playerName == con2->playerName) {
+                    cout << "[SERVER] Duplicate of " << con2->playerName << "(" << con2->ipAddress << ") kicked from the server." << endl;
+                    con2->Close();
+                }
+            }
+
+            // update players info
             MCP::Packet newPlayerInfo(0x32);
             newPlayerInfo.WriteVarInt(0); // action (0 = add player)
             newPlayerInfo.WriteVarInt(1); // num of players (only 1)
@@ -427,14 +454,7 @@ void MinecraftServer::Update()
         double dZ = (con->position.z - spawnPoint.z);
         double maxD = 32.0;
         if (dX * dX + dY * dY + dZ * dZ > maxD * maxD) {
-            MCP::Packet ppal(0x34);
-            ppal.WriteDouble(spawnPoint.x); //x
-            ppal.WriteDouble(spawnPoint.y); //y
-            ppal.WriteDouble(spawnPoint.z); //z
-            ppal.WriteFloat(spawnPoint.yaw); //yaw
-            ppal.WriteFloat(spawnPoint.pitch); //pitch
-            ppal.WriteByte(0); //relative teleportation flags
-            ppal.WriteVarInt(69); //teleport id, client should resend Teleport Confirm (0x00) with this number
+            MCP::SetPlayerPositionPacket ppal(spawnPoint);
             ppal.Send(con);
             con->position = spawnPoint;
         }
@@ -596,24 +616,10 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
                 con->position = spawnPoint;
 
                 //send "Player Position And Look" packet
-                MCP::Packet ppal(0x34);
-                ppal.WriteDouble(con->position.x); //x
-                ppal.WriteDouble(con->position.y); //y
-                ppal.WriteDouble(con->position.z); //z
-                ppal.WriteFloat(con->position.yaw); //yaw
-                ppal.WriteFloat(con->position.pitch); //pitch
-                ppal.WriteByte(0); //relative teleportation flags
-                ppal.WriteVarInt(69); //teleport id, client should resend Teleport Confirm (0x00) with this number
+                MCP::SetPlayerPositionPacket ppal(spawnPoint);
                 ppal.Send(con);
 
-                // send joining message
-                chatMessages.push_back({ con, Join });
-                cout << "[SERVER] " << playerName << "(" << con->ipAddress << ") joined the server successfully." << endl;
-
                 con->state = PLAY;
-
-
-                cout << "[SERVER] " << "Active connections: " << socketHandler.GetConnections().size() << endl;
             }
         }
         else if (con->state == PLAY) {
@@ -627,13 +633,20 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
             if (inPacket.id == 0x03) { // chat message (serverbound)
                 string message = inPacket.ReadString();
                 // cheat code!!!!!
-                if (message == "KURWA LATANIE") {
+                if (message == "KURWA LATANIE" || message == "KURWA ELKAMERAMAN") {
                     MCP::Packet flying(0x30);
                     flying.WriteByte(0x04 | 0x02); // flying & allow fly
                     flying.WriteFloat(0.05f);
                     flying.WriteFloat(0.1f);
                     flying.Send(con);
-                    cout << "[CHEAT] " << con->playerName << " has activated flying!!!" << endl;
+                    if (message == "KURWA LATANIE") {
+                        cout << "[CHEAT] " << con->playerName << " has activated flying!!!" << endl;
+                    }
+                    else if (message == "KURWA ELKAMERAMAN") {
+                        MCP::SetPlayerPositionPacket ppal(PlayerPosition{7,25.4,9.5,-90,90});
+                        ppal.Send(con);
+                        cout << "[CHEAT] " << con->playerName << " has became EL CAMERAMAN!!!" << endl;
+                    }
                 }
                 else {
                     chatMessages.push_back({ con, Message, message });

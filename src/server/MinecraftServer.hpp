@@ -5,6 +5,16 @@
 #include "MinecraftChunk.hpp"
 #include "DumbController.hpp"
 
+
+struct PlayerPosition {
+    double x = 0;
+    double y = 0;
+    double z = 0;
+    float yaw = 0;
+    float pitch = 0;
+    bool onGround = false;
+};
+
 namespace MCP {
     class HandshakeInPacket : public Packet {
     public:
@@ -26,6 +36,19 @@ namespace MCP {
         LoginSuccessOutPacket(UUID uuid, std::string name) : Packet(0x02) {
             WriteUUID(uuid);
             WriteString(name);
+        }
+    };
+
+    class SetPlayerPositionPacket : public Packet {
+    public:
+        SetPlayerPositionPacket(PlayerPosition pp) : Packet(0x34) {
+            WriteDouble(pp.x); //x
+            WriteDouble(pp.y); //y
+            WriteDouble(pp.z); //z
+            WriteFloat(pp.yaw); //yaw
+            WriteFloat(pp.pitch); //pitch
+            WriteByte(0); //relative teleportation flags
+            WriteVarInt(69); //teleport id, client should resend Teleport Confirm (0x00) with this number, not used lol
         }
     };
 }
@@ -54,14 +77,6 @@ struct ChatMessage {
     string message;
 };
 
-struct PlayerPosition {
-    double x = 0;
-    double y = 0;
-    double z = 0;
-    float yaw = 0;
-    float pitch = 0;
-    bool onGround = false;
-};
 
 class MinecraftConnection : public ServerConnection {
 public:
