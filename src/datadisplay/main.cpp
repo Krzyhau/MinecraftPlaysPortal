@@ -145,8 +145,13 @@ void DataReceiveLoop() {
             g_dataReceiver->Initialize(serverIP);
             cout << "connected" << endl;
             while (g_dataReceiver->IsActive()) {
+                auto prevTime = chrono::system_clock::now();
                 g_dataReceiver->ReceiveData();
-                this_thread::sleep_for(50ms);
+                auto currTime = chrono::system_clock::now();
+
+                auto sleepTime = 50ms - (currTime - prevTime);
+                if (sleepTime < 1ms)sleepTime = 1ms;
+                this_thread::sleep_for(sleepTime);
             }
             g_dataReceiver->Disable();
         }
