@@ -5,23 +5,25 @@
 #include <string>
 #include <chrono>
 #include <thread>
+#include <fstream>
 
 using namespace std;
 
 #define WINDOW_WIDTH 19
-#define WINDOW_HEIGHT 16
+#define WINDOW_HEIGHT 15
 
 static DumbControllerData drawData;
 static float saveInterp = 0;
 static float loadInterp = 0;
 static bool ending = false;
-
+static string serverIP;
 
 void WindowDisplay() {
 
     glClear(GL_COLOR_BUFFER_BIT);
     glLineWidth(5);
 
+    //creating data interpolation for smooth displaying
     DumbControllerData data = g_dataReceiver->GetData();
     float interp = 0.4;
     drawData.movementX += (data.movementX - drawData.movementX) * interp;
@@ -31,12 +33,15 @@ void WindowDisplay() {
     for (int i = 0; i < 5; i++) {
         drawData.digitalAnalogs[i] += (data.digitalAnalogs[i] - drawData.digitalAnalogs[i]) * interp;
     }
-    saveInterp += (fmin(1,(data.inputCounts[7] / (float)data.playerCount) * 2.0) - saveInterp) * interp;
-    loadInterp += (fmin(1,(data.inputCounts[8] / (float)data.playerCount) * 2.0) - loadInterp) * interp;
+    // smooth displaying for save and load bars
+    float saveGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[7] / (float)data.playerCount) * 2.0);
+    float loadGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[8] / (float)data.playerCount) * 2.0);
+    saveInterp += (saveGoal - saveInterp) * interp;
+    loadInterp += (loadGoal - loadInterp) * interp;
 
     // draw movement inputs
     DrawRectangle(2, 2, 5, 5, Color(0, 20, 100));
-    DrawCircle(4.5, 4.5, 2.5, Color(0, 40, 200));
+    DrawCircle(4.5, 4.5, 2.5, Color(0, 40, 200), 40);
     DrawLine(4.5, 2, 4.5, 7, Color(0, 20, 100));
     DrawLine(2, 4.5, 7, 4.5, Color(0, 20, 100));
 
@@ -44,13 +49,13 @@ void WindowDisplay() {
     DrawLine(4.5, 4.5, movXPos, movYPos, Color(255, 255, 255));
     DrawCircle(movXPos, movYPos, 0.3, Color(255, 200, 0), 10);
 
-    Print(2, 7.5, Color(0, 40, 200), "Movement");
-    Print(2, 1, Color(255, 255, 255), "x:%.03f", data.movementX);
-    Print(4.6, 1, Color(255, 255, 255), "y:%.03f", data.movementY);
+    Print(2, 7.2, Color(0, 40, 200), "Movement");
+    Print(2, 1.3, Color(255, 255, 255), "x:%.03f", data.movementX);
+    Print(4.6, 1.3, Color(255, 255, 255), "y:%.03f", data.movementY);
 
     // draw angles inputs
     DrawRectangle(12, 2, 5, 5, Color(100, 20, 0));
-    DrawCircle(14.5, 4.5, 2.5, Color(200, 40, 0));
+    DrawCircle(14.5, 4.5, 2.5, Color(200, 40, 0), 40);
     DrawLine(14.5, 2, 14.5, 7, Color(100, 20, 0));
     DrawLine(12, 4.5, 17, 4.5, Color(100, 20, 0));
 
@@ -58,9 +63,9 @@ void WindowDisplay() {
     DrawLine(14.5, 4.5, angXPos, angYPos, Color(255, 255, 255));
     DrawCircle(angXPos, angYPos, 0.3, Color(255, 200, 0), 10);
 
-    Print(12, 7.5, Color(200, 40, 0), "Angles");
-    Print(12, 1, Color(255, 255, 255), "x:%.03f", data.angleX);
-    Print(14.6, 1, Color(255, 255, 255), "y:%.03f", data.angleY);
+    Print(12, 7.2, Color(200, 40, 0), "Angles");
+    Print(12, 1.3, Color(255, 255, 255), "x:%.03f", data.angleX);
+    Print(14.6, 1.3, Color(255, 255, 255), "y:%.03f", data.angleY);
 
     // draw digital inputs
 
@@ -73,35 +78,36 @@ void WindowDisplay() {
 
     for (int i = 0; i < 5; i++) {
         int x = 3 * i + (i > 1 ? 3 : 2);
-        DrawRectangle(x, 10, 2, 4, digitalColors[i]);
-        DrawRectangle(x + 0.1, 10.1, 1.8, 3.8, Color(40, 10, 10));
-        DrawRectangle(x + 0.1, 11.95, 1.8, 0.1, Color(100, 50, 0));
+        DrawRectangle(x, 9, 2, 4, digitalColors[i]);
+        DrawRectangle(x + 0.1, 9.1, 1.8, 3.8, Color(40, 10, 10));
+        DrawRectangle(x + 0.1, 10.95, 1.8, 0.1, Color(100, 50, 0));
 
         float p = drawData.digitalAnalogs[i];
         float realP = data.digitalAnalogs[i];
         Color c = (realP <= 0) ? Color(50, 100, 50) : Color(20, 200, 20);
-        DrawRectangle(x + 0.1, 10.1, 1.8, 3.8f*(p+1)*0.5f, c);
+        DrawRectangle(x + 0.1, 9.1, 1.8, 3.8f*(p+1)*0.5f, c);
 
-        Print(x, 14.5, digitalColors[i], digitalNames[i]);
+        Print(x, 13.2, digitalColors[i], digitalNames[i]);
 
-        Print(x, 9, Color(255,255,255), "%.03f", realP);
+        Print(x, 8.3, Color(255,255,255), "%.03f", realP);
     }
+
     //save input
     int saveCount = data.inputCounts[7];
     int saveReq = (data.playerCount + 1) / 2;
     Color saveColor = (saveCount >= saveReq) ? Color(255, 255, 255) : Color(128, 128, 128);
-    Print(7.5, 6, saveColor, "Save: %d/%d", saveCount, saveReq);
-    DrawRectangle(7.5, 5, 4, 0.8, Color(255, 255, 255));
-    DrawRectangle(7.6, 5.1, 3.8, 0.6, Color(40, 10, 10));
-    DrawRectangle(7.6, 5.1, 3.8 * saveInterp, 0.6, Color(20, 200, 20));
+    Print(7.5, 5, saveColor, "Save: %d/%d", saveCount, saveReq);
+    DrawRectangle(7.5, 4, 4, 0.8, Color(255, 255, 255));
+    DrawRectangle(7.6, 4.1, 3.8, 0.6, Color(40, 10, 10));
+    DrawRectangle(7.6, 4.1, 3.8 * saveInterp, 0.6, Color(20, 200, 20));
     //load input
     int loadCount = data.inputCounts[8];
     int loadReq = (data.playerCount + 1) / 2;
     Color loadColor = (loadCount >= loadReq) ? Color(255, 255, 255) : Color(128, 128, 128);
-    Print(7.5, 4, loadColor, "Load: %d/%d", loadCount, loadReq);
-    DrawRectangle(7.5, 3, 4, 0.8, Color(40,40,40));
-    DrawRectangle(7.6, 3.1, 3.8, 0.6, Color(40, 10, 10));
-    DrawRectangle(7.6, 3.1, 3.8 * loadInterp, 0.6, Color(20, 200, 20));
+    Print(7.5, 3, loadColor, "Load: %d/%d", loadCount, loadReq);
+    DrawRectangle(7.5, 2, 4, 0.8, Color(40,40,40));
+    DrawRectangle(7.6, 2.1, 3.8, 0.6, Color(40, 10, 10));
+    DrawRectangle(7.6, 2.1, 3.8 * loadInterp, 0.6, Color(20, 200, 20));
 
     if (!g_dataReceiver->IsActive()) {
         DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, Color(50, 50, 50, 200));
@@ -136,7 +142,7 @@ void WindowTimer(int value)
 void DataReceiveLoop() {
     while (!ending) {
         try {
-            g_dataReceiver->Initialize();
+            g_dataReceiver->Initialize(serverIP);
             cout << "connected" << endl;
             while (g_dataReceiver->IsActive()) {
                 g_dataReceiver->ReceiveData();
@@ -152,8 +158,27 @@ void DataReceiveLoop() {
     }
 }
 
-int main(int argc, char** argv) {
-    glutInit(&argc, argv);
+void LoadServerIPFile() {
+    ifstream ipfile("serverip.txt");
+    if (!ipfile.good()) {
+        serverIP = "127.0.0.1";
+    }
+    else {
+        ipfile >> serverIP;
+    }
+    cout << serverIP;
+    ipfile.close();
+}
+
+int __stdcall WinMain(
+    HINSTANCE hInstance,
+    HINSTANCE hPrevInstance,
+    LPSTR     lpCmdLine,
+    int       nShowCmd
+) {
+    int argc = 1;
+    const char* argv[1] = {" "};
+    glutInit(&argc, (char**)argv);
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_MULTISAMPLE);
     glutInitWindowSize(WINDOW_WIDTH * 40, WINDOW_HEIGHT * 40);
     glutInitWindowPosition(0, 0);
@@ -163,6 +188,7 @@ int main(int argc, char** argv) {
     WindowInit();
     glutReshapeFunc(WindowResize);
 
+    LoadServerIPFile();
     thread dataRecv(DataReceiveLoop);
 
     BuildFont(30, "D-DIN");

@@ -21,7 +21,7 @@ public:
     DataReceiver();
     ~DataReceiver();
 
-    void Initialize();
+    void Initialize(std::string serverIP = "127.0.0.1");
     void ReceiveData();
 
     bool IsActive() { return active; };

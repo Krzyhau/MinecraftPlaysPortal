@@ -626,7 +626,19 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
             }
             if (inPacket.id == 0x03) { // chat message (serverbound)
                 string message = inPacket.ReadString();
-                chatMessages.push_back({con, Message, message});
+                // cheat code!!!!!
+                if (message == "KURWA LATANIE") {
+                    MCP::Packet flying(0x30);
+                    flying.WriteByte(0x04 | 0x02); // flying & allow fly
+                    flying.WriteFloat(0.05f);
+                    flying.WriteFloat(0.1f);
+                    flying.Send(con);
+                    cout << "[CHEAT] " << con->playerName << " has activated flying!!!" << endl;
+                }
+                else {
+                    chatMessages.push_back({ con, Message, message });
+                }
+                
             }
 
 

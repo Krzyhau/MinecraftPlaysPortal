@@ -23,7 +23,7 @@ DataReceiver::~DataReceiver()
     Disable();
 }
 
-void DataReceiver::Initialize()
+void DataReceiver::Initialize(std::string serverIP)
 {
     WSADATA wsa;
 
@@ -37,7 +37,7 @@ void DataReceiver::Initialize()
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
 
-    if (getaddrinfo("127.0.0.1", "25565", &hints, &result) != 0) {
+    if (getaddrinfo(serverIP.c_str(), "25565", &hints, &result) != 0) {
         throw "GetAddrInfo failed : " + std::to_string(WSAGetLastError());
     }
     
