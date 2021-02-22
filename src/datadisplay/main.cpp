@@ -35,8 +35,9 @@ void WindowDisplay() {
         drawData.digitalAnalogs[i] += (data.digitalAnalogs[i] - drawData.digitalAnalogs[i]) * interp;
     }
     // smooth displaying for save and load bars
-    float saveGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[7] / (float)data.playerCount) * saveLoadDiv);
-    float loadGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[8] / (float)data.playerCount) * saveLoadDiv);
+    float reqPlayerCount = ceil(data.playerCount / saveLoadDiv);
+    float saveGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[7] / reqPlayerCount) );
+    float loadGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[8] / reqPlayerCount) );
     saveInterp += (saveGoal - saveInterp) * interp;
     loadInterp += (loadGoal - loadInterp) * interp;
 

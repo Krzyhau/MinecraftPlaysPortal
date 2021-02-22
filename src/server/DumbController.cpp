@@ -4,7 +4,6 @@
 #include "Packet.hpp"
 #include "DumbController.hpp"
 
-DumbController* g_dumbController = new DumbController();
 
 DumbControllerZone DumbController::zones[DUMB_CONTROLLER_INPUT_COUNT] = {
     {0,0,0,0,2,"",6}, // none
@@ -23,8 +22,18 @@ string DumbController::inputColors[DUMB_CONTROLLER_INPUT_COUNT] = {
     "white", "dark_aqua", "red", "aqua", "gold", "green", "dark_purple", "yellow", "gray", "dark_gray"
 };
 
+DumbController* g_dumbController = new DumbController();
+
 DumbController::DumbController()
 {
+    // fix all inputs to count your entire hitbox
+    static const float hitboxSize = 0.299;
+    for (int i = 0; i < DUMB_CONTROLLER_INPUT_COUNT; i++) {
+        zones[i].minX -= hitboxSize;
+        zones[i].minZ -= hitboxSize;
+        zones[i].maxX += hitboxSize;
+        zones[i].maxZ += hitboxSize;
+    }
 }
 
 void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
