@@ -107,7 +107,10 @@ void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
             }
         }
         for (MinecraftConnection* con : cat) {
-            SendDisplayPackets(con, (DumbInputType)i);
+            DumbInputType type = (DumbInputType)i;
+            SendDisplayPackets(con, type);
+            con->currentControllerZone = type;
+            if (type != None)con->lastControllerZone = type;
         }
     }
 
@@ -137,7 +140,6 @@ void DumbController::SendDisplayPackets(MinecraftConnection* con, DumbInputType 
             bossBar.WriteByte(0);
             bossBar.Send(con);
         }
-        con->currentControllerZone = type;
     }
 }
 

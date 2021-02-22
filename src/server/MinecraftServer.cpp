@@ -11,18 +11,76 @@
 using namespace std;
 using namespace MCP;
 
-MinecraftServer* gMCServer = new MinecraftServer();
+MinecraftServer* g_mcServer = new MinecraftServer();
 ChunkWorld* gWorld = new ChunkWorld();
 
 MinecraftServer::MinecraftServer()
 {
     spawnPoint = { 3,2,9.5,-90,0,false };
     requiredProtocol = 754; // 1.16.4 or 1.16.5
+
+    // setup chat and commands
+    g_chat = new Chat(this);
+    // command for generating god key and claiming god status
+    g_chat->AddCommand("god", [](MinecraftConnection* con, string param) {
+        if (con->god) {
+            g_chat->Send({ con, "You are a god already.", Info, "yellow" }, con);
+        }
+        else if (param == "claim") {
+            // generating new key and sending it to the console
+            uint16_t key = chrono::duration_cast<chrono::nanoseconds>(chrono::system_clock::now().time_since_epoch()).count() * 69;
+            con->server->secretKey = key;
+            cout << "[GODMODE] " << con->playerName << " requested new key: " << key << endl;
+            g_chat->Send({ con, "A new god key has been generated and displayed in console.", Info, "yellow" }, con);
+        }
+        else {
+            // comparing sent key with generated one
+            int inputKey = 0;
+            try {
+                inputKey = stoi(param);
+            } catch (...) {}
+            if (inputKey == con->server->secretKey && inputKey != 0) {
+                con->god = true;
+                g_chat->Send({ con, "You've achieved a god status!", Info, "yellow" }, con);
+            }
+            else {
+                g_chat->Send({ con, "Invalid god key!", Info, "red" }, con);
+            }
+            con->server->secretKey = 0;
+        }
+    });
+
+    g_chat->AddCommand("elkameraman", [](MinecraftConnection* con, string param) {
+        if (!con->god) {
+            g_chat->Send({ con, "You are not worthy the title of El Kameraman!!!!.", Info, "red" }, con);
+            return;
+        }
+        MCP::Packet flying(0x30);
+        flying.WriteByte(0x04 | 0x02); // flying & allow fly
+        flying.WriteFloat(0.05f);
+        flying.WriteFloat(0.1f);
+        flying.Send(con);
+        MCP::SetPlayerPositionPacket ppal(PlayerPosition{ 7,25.4,9.5,-90,90 });
+        ppal.Send(con);
+    });
+    g_chat->AddCommand("fly", [](MinecraftConnection* con, string param) {
+        if (!con->god) {
+            g_chat->Send({ con, "fuck you, no.", Info, "red" }, con);
+            return;
+        }
+        MCP::Packet flying(0x30);
+        flying.WriteByte(0x04 | 0x02); // flying & allow fly
+        flying.WriteFloat(0.05f);
+        flying.WriteFloat(0.1f);
+        flying.Send(con);
+    });
 }
 
 MinecraftServer::~MinecraftServer()
 {
     Stop();
+    delete g_chat;
+    delete socketHandler;
 }
 
 
@@ -37,13 +95,14 @@ void MinecraftServer::Start()
     CreateWorld();
 
     cout << "[SERVER] " << "Initializing socket handler... " << endl;
-    socketHandler.Initialize();
+    socketHandler = new ServerConnectionHandler();
+    socketHandler->Initialize();
 
-    socketHandler.SetReceiveCallback([](ServerConnection * con) {
-        gMCServer->OnPacketReceive((MinecraftConnection*)con); // thats soo bad lol
+    socketHandler->SetReceiveCallback([](ServerConnection * con) {
+        g_mcServer->OnPacketReceive((MinecraftConnection*)con); // thats soo bad lol
     });
 
-    socketHandler.SetErrorCallback([](ServerConnection* con, string error) {
+    socketHandler->SetErrorCallback([](ServerConnection* con, string error) {
         cout << "[SERVER] ";
         MinecraftConnection* mccon = (MinecraftConnection*)con;
         if (mccon->state == DATA) {
@@ -56,7 +115,7 @@ void MinecraftServer::Start()
     });
 
     cout << "[SERVER] " << "Server is active. Running in a loop..." << endl;
-    while (socketHandler.IsActive()) {
+    while (socketHandler->IsActive()) {
         Update();
     }
 }
@@ -136,9 +195,9 @@ void MinecraftServer::Update()
 {
     uint64_t now = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
     // quickly getting all connections that are currently in game and that left the game
-    vector<MinecraftConnection*> conLeavingGame;
-    vector<MinecraftConnection*> conInGame;
-    for (ServerConnection* con : socketHandler.GetConnections()) {
+    conLeavingGame.clear();
+    conInGame.clear();
+    for (ServerConnection* con : socketHandler->GetConnections()) {
         MinecraftConnection* mccon = (MinecraftConnection*)con;
         if (mccon->state != PLAY) continue;
         if (!con->IsActive()) {
@@ -153,10 +212,10 @@ void MinecraftServer::Update()
     playerCount = conInGame.size();
 
     // clean connections that have already ended
-    socketHandler.CheckConnections();
+    socketHandler->CheckConnections();
     // wait for new connections
-    if (socketHandler.HasNewConnection()) {
-        socketHandler.PrepareNewConnection(new MinecraftConnection(&socketHandler));
+    if (socketHandler->HasNewConnection()) {
+        socketHandler->PrepareNewConnection(new MinecraftConnection(this));
     }
 
 
@@ -173,7 +232,7 @@ void MinecraftServer::Update()
 
         for (MinecraftConnection* leavingCon : conLeavingGame) {
             // add leaving message
-            chatMessages.push_back({ leavingCon, Leave });
+            g_chat->Send({ leavingCon, Leave });
             cout << "[SERVER] " << leavingCon->playerName << "(" << leavingCon->ipAddress << ") disconnected from the game." << endl;
 
             // send remove player packet for player info
@@ -189,48 +248,6 @@ void MinecraftServer::Update()
             leavingPlayersInfo.Send(gamingCon);
         }
     }
-
-    // converting all chat messages into strings
-    vector<string> chatMsgBuffer;
-    for (ChatMessage& message : chatMessages) {
-        string chatMsg = "[{\"text\":\"\"},";
-
-        // stringify the string message for proper json format
-        // avoiding fucking crash caused by posting SINGULAR quotation mark wtf
-        string fixedMsg = "";
-        for (const char& c : message.message) {
-            switch(c){
-                case 0x08: fixedMsg += "\\b"; break;
-                case 0x0C: fixedMsg += "\\f"; break;
-                case 0x0A: fixedMsg += "\\n"; break;
-                case 0x0D: fixedMsg += "\\r"; break;
-                case 0x09: fixedMsg += "\\t"; break;
-                case 0x22: fixedMsg += "\\\""; break;
-                case 0x5C: fixedMsg += "\\\\"; break;
-                default: fixedMsg += c;
-            }
-        }
-
-        if (message.type == Join) {
-            chatMsg += "{\"text\":\"+ " + message.sender->playerName + "\",\"color\":\"green\"}]";
-        }
-        else if (message.type == Leave) {
-            chatMsg += "{\"text\":\"- " + message.sender->playerName + "\",\"color\":\"red\"}]";
-        }
-        else if (message.type == Message) {
-            chatMsg += "{\"text\":\"" + message.sender->playerName + ": \",\"bold\":true,\"color\":\"";
-            chatMsg += DumbController::inputColors[message.sender->currentControllerZone];
-            chatMsg += "\"},{\"text\":\"" + fixedMsg + "\"}]";
-        }
-
-        chatMsgBuffer.push_back(chatMsg);
-
-        if (message.type == Message) {
-            cout << "[CHAT] " << message.sender->playerName << ": " << fixedMsg << endl;
-        }
-        
-    }
-    chatMessages.clear();
 
     for (MinecraftConnection* con : conInGame) {
         // handle Keep Alive packet
@@ -251,21 +268,12 @@ void MinecraftServer::Update()
             }
         }
 
-        // handle chat
-        for (string& message : chatMsgBuffer) {
-            MCP::Packet testMessage(0x0E);
-            testMessage.WriteString(message);
-            testMessage.WriteByte(0);
-            testMessage.WriteUUID({ 0,0 });
-            testMessage.Send(con);
-        }
-
         // handle joining
         if (!con->joined) {
             // send joining message
-            chatMessages.push_back({ con, Join });
+            g_chat->Send({ con, Join });
             cout << "[SERVER] " << con->playerName << "(" << con->ipAddress << ") joined the server successfully." << endl;
-            cout << "[SERVER] " << "Active connections: " << socketHandler.GetConnections().size() << endl;
+            cout << "[SERVER] " << "Active connections: " << socketHandler->GetConnections().size() << endl;
 
             // remove duplicates (no fucking clue where they come from, but lets hope that fixes it)
             for (MinecraftConnection* con2 : conInGame) {
@@ -286,7 +294,7 @@ void MinecraftServer::Update()
             newPlayerInfo.WriteString(con->texture);
             newPlayerInfo.WriteByte(0); // not signed
             newPlayerInfo.WriteVarInt(2);
-            newPlayerInfo.WriteVarInt(1001);
+            newPlayerInfo.WriteVarInt(0); // latency (ping)
             newPlayerInfo.WriteByte(0);
 
             MCP::Packet playerInfos(0x32);
@@ -462,14 +470,11 @@ void MinecraftServer::Update()
         //cout << "x:" << con->position.x << ", y:" << con->position.y << ", z:" << con->position.z << ", yaw:" << con->position.yaw << ", pitch:" << con->position.pitch << ", onGround:" << con->position.onGround << endl;
     }
 
-    //clear chat buffer
-    chatMsgBuffer.clear();
-
     //update controller
     g_dumbController->ProcessClients(conInGame);
 
     //quickly go over controller data connections to disable inactive ones
-    for (ServerConnection* con : socketHandler.GetConnections()) {
+    for (ServerConnection* con : socketHandler->GetConnections()) {
         MinecraftConnection* mccon = (MinecraftConnection*)con;
         if (!con->IsActive() || mccon->state != DATA) continue;
         if (mccon->lastAliveVerified) {
@@ -632,26 +637,7 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
             }
             if (inPacket.id == 0x03) { // chat message (serverbound)
                 string message = inPacket.ReadString();
-                // cheat code!!!!!
-                if (message == "KURWA LATANIE" || message == "KURWA ELKAMERAMAN") {
-                    MCP::Packet flying(0x30);
-                    flying.WriteByte(0x04 | 0x02); // flying & allow fly
-                    flying.WriteFloat(0.05f);
-                    flying.WriteFloat(0.1f);
-                    flying.Send(con);
-                    if (message == "KURWA LATANIE") {
-                        cout << "[CHEAT] " << con->playerName << " has activated flying!!!" << endl;
-                    }
-                    else if (message == "KURWA ELKAMERAMAN") {
-                        MCP::SetPlayerPositionPacket ppal(PlayerPosition{7,25.4,9.5,-90,90});
-                        ppal.Send(con);
-                        cout << "[CHEAT] " << con->playerName << " has became EL CAMERAMAN!!!" << endl;
-                    }
-                }
-                else {
-                    chatMessages.push_back({ con, Message, message });
-                }
-                
+                g_chat->Send({ con, message });
             }
 
 
@@ -710,6 +696,19 @@ void MinecraftServer::OnPacketReceive(MinecraftConnection* con) {
 }
 
 void MinecraftServer::Stop() {
-    socketHandler.Close();
+    //idk i'll TRY to send disconnect message to all of players
+    for (MinecraftConnection* con : conInGame) {
+        MCP::Packet disconnect(0x19);
+        disconnect.WriteString(R"( {"text":"Server closed.","bold":"true"} )");
+        disconnect.Send(con);
+    }
+    socketHandler->Close();
 }
 
+
+
+
+MinecraftConnection::MinecraftConnection(MinecraftServer* server)
+    : ServerConnection(server->GetConnectionHandler())
+    , server(server) 
+{}

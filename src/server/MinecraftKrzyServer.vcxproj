@@ -158,6 +158,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Chat.cpp" />
     <ClCompile Include="DumbController.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MinecraftChunk.cpp" />
@@ -167,6 +168,7 @@
     <ClCompile Include="ServerConnection.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Chat.hpp" />
     <ClInclude Include="common.hpp" />
     <ClInclude Include="DumbController.hpp" />
     <ClInclude Include="MinecraftChunk.hpp" />

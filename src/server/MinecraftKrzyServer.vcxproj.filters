@@ -8,6 +8,7 @@
     <ClCompile Include="NBT.cpp" />
     <ClCompile Include="MinecraftChunk.cpp" />
     <ClCompile Include="DumbController.cpp" />
+    <ClCompile Include="Chat.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Packet.hpp" />
@@ -18,5 +19,6 @@
     <ClInclude Include="MinecraftServerResources.hpp" />
     <ClInclude Include="MinecraftChunk.hpp" />
     <ClInclude Include="DumbController.hpp" />
+    <ClInclude Include="Chat.hpp" />
   </ItemGroup>
 </Project>

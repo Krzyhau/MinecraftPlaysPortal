@@ -4,7 +4,7 @@
 #include "Packet.hpp"
 #include "MinecraftChunk.hpp"
 #include "DumbController.hpp"
-
+#include "Chat.hpp"
 
 struct PlayerPosition {
     double x = 0;
@@ -64,24 +64,13 @@ enum MinecraftConnectionState {
     DATA
 };
 
-enum ChatMessageType {
-    Message,
-    Join,
-    Leave,
-    ServerInfo
-};
-
-struct ChatMessage {
-    MinecraftConnection* sender;
-    ChatMessageType type;
-    string message;
-};
-
+class MinecraftServer;
 
 class MinecraftConnection : public ServerConnection {
 public:
     MinecraftConnectionState state = NONE;
     bool joined = false;
+    MinecraftServer* server;
 
     int protocolVer = 0;
     string playerName;
@@ -97,24 +86,31 @@ public:
     uint8_t handAnimState = 0;
 
     DumbInputType currentControllerZone = None;
+    DumbInputType lastControllerZone = None;
+
+    bool god = false;
 
     uint64_t lastAlive = 0;
     bool lastAliveVerified = true;
-
-
 public:
-    MinecraftConnection(ServerConnectionHandler* handler) : ServerConnection(handler) {};
+    MinecraftConnection(MinecraftServer* server);
 };
 
 
+class Chat;
+
 class MinecraftServer {
 private:
-    ServerConnectionHandler socketHandler;
-    vector<ChatMessage> chatMessages;
+    ServerConnectionHandler* socketHandler = nullptr;
     PlayerPosition spawnPoint;
     int nextEntityId = 1;
     int playerCount = 0;
     int requiredProtocol;
+
+    vector<MinecraftConnection*> conInGame;
+    vector<MinecraftConnection*> conLeavingGame;
+public:
+    int secretKey = 0;
 public:
     MinecraftServer();
     ~MinecraftServer();
@@ -123,8 +119,11 @@ public:
     
     void CreateWorld();
     uint32_t ReserveEntityID();
+
     int GetPlayerCount() { return playerCount; }
     int GetProtocol() { return requiredProtocol; }
+    vector<MinecraftConnection*> GetInGameConnections() { return conInGame; }
+    ServerConnectionHandler* GetConnectionHandler() { return socketHandler; }
 
     void Update();
     void OnPacketReceive(MinecraftConnection* con);
@@ -132,5 +131,5 @@ public:
     void Stop();
 };
 
-extern MinecraftServer* gMCServer;
+extern MinecraftServer* g_mcServer;
 

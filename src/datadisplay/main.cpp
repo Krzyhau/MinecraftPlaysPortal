@@ -17,6 +17,7 @@ static float saveInterp = 0;
 static float loadInterp = 0;
 static bool ending = false;
 static string serverIP;
+static const float saveLoadDiv = 3.0f;
 
 void WindowDisplay() {
 
@@ -34,8 +35,8 @@ void WindowDisplay() {
         drawData.digitalAnalogs[i] += (data.digitalAnalogs[i] - drawData.digitalAnalogs[i]) * interp;
     }
     // smooth displaying for save and load bars
-    float saveGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[7] / (float)data.playerCount) * 2.0);
-    float loadGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[8] / (float)data.playerCount) * 2.0);
+    float saveGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[7] / (float)data.playerCount) * saveLoadDiv);
+    float loadGoal = (data.playerCount == 0) ? 0 : fmin(1, (data.inputCounts[8] / (float)data.playerCount) * saveLoadDiv);
     saveInterp += (saveGoal - saveInterp) * interp;
     loadInterp += (loadGoal - loadInterp) * interp;
 
@@ -94,7 +95,7 @@ void WindowDisplay() {
 
     //save input
     int saveCount = data.inputCounts[7];
-    int saveReq = (data.playerCount + 1) / 2;
+    int saveReq = (data.playerCount + 1) / saveLoadDiv;
     Color saveColor = (saveCount >= saveReq) ? Color(255, 255, 255) : Color(128, 128, 128);
     Print(7.5, 5, saveColor, "Save: %d/%d", saveCount, saveReq);
     DrawRectangle(7.5, 4, 4, 0.8, Color(255, 255, 255));
@@ -102,7 +103,7 @@ void WindowDisplay() {
     DrawRectangle(7.6, 4.1, 3.8 * saveInterp, 0.6, Color(20, 200, 20));
     //load input
     int loadCount = data.inputCounts[8];
-    int loadReq = (data.playerCount + 1) / 2;
+    int loadReq = (data.playerCount + 1) / saveLoadDiv;
     Color loadColor = (loadCount >= loadReq) ? Color(255, 255, 255) : Color(128, 128, 128);
     Print(7.5, 3, loadColor, "Load: %d/%d", loadCount, loadReq);
     DrawRectangle(7.5, 2, 4, 0.8, Color(40,40,40));

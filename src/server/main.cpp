@@ -11,7 +11,7 @@
 
 
 int main() {
-    gMCServer->Start();
-    gMCServer->Stop();
+    g_mcServer->Start();
+    g_mcServer->Stop();
     return 0;
 }
