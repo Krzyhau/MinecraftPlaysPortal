@@ -27,7 +27,7 @@ DumbController* g_dumbController = new DumbController();
 DumbController::DumbController()
 {
     // fix all inputs to count your entire hitbox
-    static const float hitboxSize = 0.299;
+    static const float hitboxSize = 0.299f;
     for (int i = 0; i < DUMB_CONTROLLER_INPUT_COUNT; i++) {
         zones[i].minX -= hitboxSize;
         zones[i].minZ -= hitboxSize;

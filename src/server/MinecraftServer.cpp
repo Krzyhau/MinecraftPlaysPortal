@@ -16,6 +16,7 @@ ChunkWorld* gWorld = new ChunkWorld();
 
 MinecraftServer::MinecraftServer()
 {
+    secretKey = "KURWAJAPIERDOLE";
     spawnPoint = { 3,2,9.5,-90,0,false };
     requiredProtocol = 754; // 1.16.4 or 1.16.5
 
@@ -26,27 +27,15 @@ MinecraftServer::MinecraftServer()
         if (con->god) {
             g_chat->Send({ con, "You are a god already.", Info, "yellow" }, con);
         }
-        else if (param == "claim") {
-            // generating new key and sending it to the console
-            uint16_t key = chrono::duration_cast<chrono::nanoseconds>(chrono::system_clock::now().time_since_epoch()).count() * 69;
-            con->server->secretKey = key;
-            cout << "[GODMODE] " << con->playerName << " requested new key: " << key << endl;
-            g_chat->Send({ con, "A new god key has been generated and displayed in console.", Info, "yellow" }, con);
-        }
         else {
             // comparing sent key with generated one
-            int inputKey = 0;
-            try {
-                inputKey = stoi(param);
-            } catch (...) {}
-            if (inputKey == con->server->secretKey && inputKey != 0) {
+            if (param == con->server->secretKey) {
                 con->god = true;
                 g_chat->Send({ con, "You've achieved a god status!", Info, "yellow" }, con);
             }
             else {
                 g_chat->Send({ con, "Invalid god key!", Info, "red" }, con);
             }
-            con->server->secretKey = 0;
         }
     });
 

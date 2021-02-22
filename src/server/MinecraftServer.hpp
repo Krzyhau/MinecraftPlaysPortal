@@ -110,7 +110,7 @@ private:
     vector<MinecraftConnection*> conInGame;
     vector<MinecraftConnection*> conLeavingGame;
 public:
-    int secretKey = 0;
+    string secretKey;
 public:
     MinecraftServer();
     ~MinecraftServer();
