@@ -96,17 +96,15 @@ void WindowDisplay() {
 
     //save input
     int saveCount = data.inputCounts[7];
-    int saveReq = (data.playerCount + 1) / saveLoadDiv;
-    Color saveColor = (saveCount >= saveReq) ? Color(255, 255, 255) : Color(128, 128, 128);
-    Print(7.5, 5, saveColor, "Save: %d/%d", saveCount, saveReq);
+    Color saveColor = (saveCount >= reqPlayerCount) ? Color(255, 255, 255) : Color(128, 128, 128);
+    Print(7.5, 5, saveColor, "Save: %d/%d", saveCount, (int)reqPlayerCount);
     DrawRectangle(7.5, 4, 4, 0.8, Color(255, 255, 255));
     DrawRectangle(7.6, 4.1, 3.8, 0.6, Color(40, 10, 10));
     DrawRectangle(7.6, 4.1, 3.8 * saveInterp, 0.6, Color(20, 200, 20));
     //load input
     int loadCount = data.inputCounts[8];
-    int loadReq = (data.playerCount + 1) / saveLoadDiv;
-    Color loadColor = (loadCount >= loadReq) ? Color(255, 255, 255) : Color(128, 128, 128);
-    Print(7.5, 3, loadColor, "Load: %d/%d", loadCount, loadReq);
+    Color loadColor = (loadCount >= reqPlayerCount) ? Color(255, 255, 255) : Color(128, 128, 128);
+    Print(7.5, 3, loadColor, "Load: %d/%d", loadCount, (int)reqPlayerCount);
     DrawRectangle(7.5, 2, 4, 0.8, Color(40,40,40));
     DrawRectangle(7.6, 2.1, 3.8, 0.6, Color(40, 10, 10));
     DrawRectangle(7.6, 2.1, 3.8 * loadInterp, 0.6, Color(20, 200, 20));

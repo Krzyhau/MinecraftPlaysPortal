@@ -210,6 +210,9 @@ void MinecraftServer::Update()
 
     // do all sorts of stuff to "update" the state of the server here
 
+    //update controller
+    g_dumbController->ProcessClients(conInGame);
+
     // handle leaving players
     if (conLeavingGame.size() > 0) {
         MCP::Packet deleteEntities(0x36);
@@ -458,9 +461,6 @@ void MinecraftServer::Update()
 
         //cout << "x:" << con->position.x << ", y:" << con->position.y << ", z:" << con->position.z << ", yaw:" << con->position.yaw << ", pitch:" << con->position.pitch << ", onGround:" << con->position.onGround << endl;
     }
-
-    //update controller
-    g_dumbController->ProcessClients(conInGame);
 
     //quickly go over controller data connections to disable inactive ones
     for (ServerConnection* con : socketHandler->GetConnections()) {

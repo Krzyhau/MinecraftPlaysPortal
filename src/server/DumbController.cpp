@@ -47,11 +47,17 @@ void DumbController::ProcessClients(vector<MinecraftConnection*> cons)
     
     for (MinecraftConnection* con : cons) {
         bool categoryFound = false;
+
         PlayerPosition pos = con->position;
+        PlayerPosition oldpos = con->oldPosition;
+
         for (int i = 1; i < DUMB_CONTROLLER_INPUT_COUNT; i++) {
             DumbControllerZone zone = zones[i];
+
+            bool isOnRightY = (pos.y == zone.y) || (pos.y > zone.y && pos.y + (pos.y - oldpos.y) < zone.y);
+
             if (pos.x >= zone.minX && pos.x <= zone.maxX
-             && pos.z >= zone.minZ && pos.z <= zone.maxZ && abs(pos.y-zone.y)<0.1) {
+             && pos.z >= zone.minZ && pos.z <= zone.maxZ && isOnRightY) {
                 categorizedConnections[i].push_back(con);
                 categoryFound = true;
                 break;
