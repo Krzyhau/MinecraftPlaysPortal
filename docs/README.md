@@ -20,9 +20,13 @@ me a quick way of *injecting* my custom inputs into the game.
 You can see the implementation in [my SAR branch](https://github.com/Krzyhau/SourceAutoRecord/tree/minecraftplays/src/Features/MinecraftKrzyController).
 
 ## Setting things up (for Portal 2)
-Everything *should* work with no major configuration. After starting the server file,
+If you have Visual C++ Redistributable installed, 
+everything *should* work with no major configuration. After starting the server file,
 open Portal 2 with modified SAR plugin, set up IP using `sar_mckrzy_setip` command,
 then connect using `sar_mckrzy_enabled 1` command.
 
 Both plugin and server may crash because of various of bugs I haven't been able to fix.
-In this case, simply restarting server/plugin will work without doing anything else.
+In this case, simply restarting server/plugin should work without doing anything else.
+
+## Download
+Go to [releases page](https://github.com/Krzyhau/MinecraftPlaysPortal/releases) for download link.
